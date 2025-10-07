@@ -16,15 +16,6 @@ import LoginPage from './pages/LoginPage.jsx';
 import RegisterPage from './pages/RegisterPage.jsx';
 
 export default function App() {
-  // Debug: Verificar variáveis de ambiente
-  const apiUrl = import.meta.env.VITE_API_BASE_URL;
-  const mode = import.meta.env.MODE;
-  
-  // Mostrar informações no título da página para debug
-  if (typeof document !== 'undefined') {
-    document.title = `OFIX ${mode} - API: ${apiUrl ? 'OK' : 'MISSING'}`;
-  }
-  
   return (
     <BrowserRouter future={{ v7_relativeSplatPath: true, v7_startTransition: true }}>
       <AuthProvider>
