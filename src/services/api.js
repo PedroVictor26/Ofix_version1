@@ -2,16 +2,15 @@
 
 import axios from "axios";
 
-// CORREÇÃO: Usando import.meta.env, que é a forma do Vite acessar variáveis de ambiente.
-// Garanta que você tem um arquivo .env na raiz do seu projeto front-end com a linha:
-// VITE_API_BASE_URL=http://localhost:3333/api
+// CORREÇÃO: Configuração simplificada e mais robusta
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://ofix-backend-prod.onrender.com';
+
 const apiClient = axios.create({
-  baseURL: import.meta.env.DEV
-    ? "/api"
-    : `${import.meta.env.VITE_API_BASE_URL}/api`,
+  baseURL: `${API_BASE_URL}/api`,
   headers: {
     "Content-Type": "application/json",
   },
+  timeout: 10000, // 10 segundos de timeout
 });
 
 // Interceptor de Requisição: Adiciona o token JWT a cada requisição

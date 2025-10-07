@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OFIX - Debug</title>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            margin: 20px; 
+            background: #f5f5f5;
+        }
+        .container { 
+            max-width: 800px; 
+            margin: 0 auto; 
+            background: white; 
+            padding: 20px; 
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .status { 
+            padding: 10px; 
+            margin: 10px 0; 
+            border-radius: 4px;
+        }
+        .success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .info { background: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
+        button { 
+            background: #007bff; 
+            color: white; 
+            border: none; 
+            padding: 10px 20px; 
+            border-radius: 4px; 
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover { background: #0056b3; }
+        pre { 
+            background: #f8f9fa; 
+            padding: 15px; 
+            border-radius: 4px; 
+            overflow-x: auto;
+            border: 1px solid #dee2e6;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 OFIX - Diagnóstico do Sistema</h1>
+        
+        <div id="status" class="status info">
+            🔄 Iniciando diagnóstico...
+        </div>
+        
+        <h2>📊 Informações do Sistema</h2>
+        <div id="system-info">
+            <strong>URL Atual:</strong> <span id="current-url"></span><br>
+            <strong>User Agent:</strong> <span id="user-agent"></span><br>
+            <strong>Timestamp:</strong> <span id="timestamp"></span>
+        </div>
+        
+        <h2>🌐 Teste de Conectividade</h2>
+        <button onclick="testBackend()">Testar Backend</button>
+        <button onclick="testCORS()">Testar CORS</button>
+        <button onclick="testAuth()">Testar Auth</button>
+        
+        <h2>📋 Resultados dos Testes</h2>
+        <pre id="test-results">Clique nos botões acima para executar os testes...</pre>
+        
+        <h2>🎯 Links Úteis</h2>
+        <ul>
+            <li><a href="/" target="_blank">🏠 OFIX Frontend</a></li>
+            <li><a href="https://ofix-backend-prod.onrender.com/health" target="_blank">💚 Backend Health</a></li>
+            <li><a href="https://ofix-backend-prod.onrender.com" target="_blank">🔗 Backend API</a></li>
+            <li><a href="/login" target="_blank">🔐 Login Page</a></li>
+        </ul>
+        
+        <div class="status info">
+            <strong>💡 Como usar:</strong><br>
+            1. Teste a conectividade com o backend<br>
+            2. Verifique se há erros no console (F12)<br>
+            3. Se tudo estiver OK, acesse <a href="/">/</a><br>
+            4. Se der erro, verifique as variáveis de ambiente
+        </div>
+    </div>
+
+    <script>
+        // Informações básicas
+        document.getElementById('current-url').textContent = window.location.href;
+        document.getElementById('user-agent').textContent = navigator.userAgent;
+        document.getElementById('timestamp').textContent = new Date().toLocaleString('pt-BR');
+        
+        const API_BASE_URL = 'https://ofix-backend-prod.onrender.com';
+        const results = document.getElementById('test-results');
+        
+        function updateStatus(message, type = 'info') {
+            const statusDiv = document.getElementById('status');
+            statusDiv.className = `status ${type}`;
+            statusDiv.innerHTML = message;
+        }
+        
+        function log(message) {
+            const timestamp = new Date().toLocaleTimeString();
+            results.textContent += `[${timestamp}] ${message}\n`;
+            results.scrollTop = results.scrollHeight;
+        }
+        
+        async function testBackend() {
+            log('🔄 Testando conectividade com backend...');
+            
+            try {
+                const response = await fetch(`${API_BASE_URL}/health`);
+                const data = await response.json();
+                
+                if (response.ok) {
+                    log('✅ Backend funcionando!');
+                    log(`   Status: ${data.status}`);
+                    log(`   Mensagem: ${data.message}`);
+                    log(`   Environment: ${data.environment}`);
+                    updateStatus('✅ Backend conectado com sucesso!', 'success');
+                } else {
+                    log(`❌ Backend retornou erro: ${response.status}`);
+                    updateStatus('❌ Backend com problemas', 'error');
+                }
+            } catch (error) {
+                log(`❌ Erro ao conectar com backend: ${error.message}`);
+                updateStatus('❌ Falha na conexão com backend', 'error');
+            }
+        }
+        
+        async function testCORS() {
+            log('🔄 Testando CORS...');
+            
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        email: 'test@test.com',
+                        senha: 'wrongpassword'
+                    })
+                });
+                
+                log('✅ CORS funcionando (request passou)');
+                log(`   Status da resposta: ${response.status}`);
+                
+                if (response.status === 401) {
+                    log('✅ Resposta 401 esperada (credenciais inválidas)');
+                } else {
+                    const data = await response.json();
+                    log(`   Resposta: ${JSON.stringify(data)}`);
+                }
+                
+                updateStatus('✅ CORS configurado corretamente', 'success');
+            } catch (error) {
+                log(`❌ Erro de CORS: ${error.message}`);
+                updateStatus('❌ Problema de CORS detectado', 'error');
+            }
+        }
+        
+        async function testAuth() {
+            log('🔄 Testando endpoint de autenticação...');
+            
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        email: 'admin@ofix.com',
+                        senha: 'admin123'
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok && data.token) {
+                    log('✅ Endpoint de auth funcionando!');
+                    log(`   Token recebido: ${data.token.substring(0, 20)}...`);
+                    updateStatus('✅ Sistema de autenticação OK', 'success');
+                } else {
+                    log(`⚠️ Auth retornou: ${response.status}`);
+                    log(`   Mensagem: ${data.error || data.message || 'Sem mensagem'}`);
+                    updateStatus('⚠️ Credenciais padrão não funcionaram', 'info');
+                }
+            } catch (error) {
+                log(`❌ Erro no teste de auth: ${error.message}`);
+                updateStatus('❌ Problema no sistema de auth', 'error');
+            }
+        }
+        
+        // Auto-teste inicial
+        setTimeout(() => {
+            updateStatus('🔄 Executando testes automáticos...', 'info');
+            testBackend();
+        }, 1000);
+    </script>
+</body>
+</html>
