@@ -440,6 +440,19 @@ export default function Layout() {
                                     </div>
                                 )}
                             </div>
+                            
+                            {/* Botão de Logout no Header */}
+                            {isAuthenticated && (
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={logout}
+                                    aria-label="Sair da conta"
+                                    className="text-slate-500 hover:text-red-600 hover:bg-red-100 rounded-lg transition-all duration-200 p-3"
+                                >
+                                    <LogOut className="w-5 h-5" />
+                                </Button>
+                            )}
                         </div>
                     </div>
                 </header>
@@ -447,8 +460,8 @@ export default function Layout() {
                 {/* Container com Sidebar e Conteúdo */}
                 <div className="flex flex-1 h-full overflow-hidden">
                     {/* Sidebar */}
-                    <Sidebar className="border-r border-slate-200/60 bg-white/95 backdrop-blur-md shadow-xl z-20 w-64 flex-shrink-0 fixed h-full top-16 left-0 hidden md:block">
-                        <SidebarContent className="p-4 pt-6">
+                    <Sidebar className="border-r border-slate-200/60 bg-white/95 backdrop-blur-md shadow-xl z-20 w-64 flex-shrink-0 fixed h-full top-16 left-0 hidden md:flex md:flex-col">
+                        <SidebarContent className="p-4 pt-6 flex-1 overflow-y-auto">
                             {/* Menu de navegação */}
                             <SidebarGroup>
                                 <SidebarGroupLabel className="text-xs font-bold text-slate-500 uppercase tracking-wider px-3 py-2 flex items-center gap-2">
@@ -497,7 +510,7 @@ export default function Layout() {
                             />
                         </SidebarContent>
 
-                        <SidebarFooter className="border-t border-slate-200/60 p-4 bg-gradient-to-r from-slate-50 to-gray-50 absolute bottom-0 left-0 right-0">
+                        <SidebarFooter className="border-t border-slate-200/60 p-4 bg-gradient-to-r from-slate-50 to-gray-50 sticky bottom-0">
                             <UserPanel
                                 user={user}
                                 isAuthenticated={isAuthenticated}
