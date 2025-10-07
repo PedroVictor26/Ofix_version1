@@ -1,0 +1,311 @@
+/* src/index.css */
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --radius: 0.625rem;
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.129 0.042 264.695);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.129 0.042 264.695);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.129 0.042 264.695);
+  --primary: oklch(0.208 0.042 265.755);
+  --primary-foreground: oklch(0.984 0.003 247.858);
+  --secondary: oklch(0.968 0.007 247.896);
+  --secondary-foreground: oklch(0.208 0.042 265.755);
+  --muted: oklch(0.968 0.007 247.896);
+  --muted-foreground: oklch(0.554 0.046 257.417);
+  --accent: oklch(0.968 0.007 247.896);
+  --accent-foreground: oklch(0.208 0.042 265.755);
+  --destructive: oklch(0.577 0.245 27.325);
+  --destructive-foreground: oklch(0.984 0.003 247.858);
+  --border: oklch(0.929 0.013 255.508);
+  --input: oklch(0.929 0.013 255.508);
+  --ring: oklch(0.208 0.042 265.755);
+  --chart-1: oklch(0.627 0.214 259.749);
+  --chart-2: oklch(0.828 0.189 84.429);
+  --chart-3: oklch(0.769 0.188 70.08);
+  --chart-4: oklch(0.828 0.189 84.429);
+  --chart-5: oklch(0.769 0.188 70.08);
+  --sidebar: oklch(0.984 0.003 247.858);
+  --sidebar-foreground: oklch(0.129 0.042 264.695);
+  --sidebar-primary: oklch(0.208 0.042 265.755);
+  --sidebar-primary-foreground: oklch(0.984 0.003 247.858);
+  --sidebar-accent: oklch(0.968 0.007 247.896);
+  --sidebar-accent-foreground: oklch(0.208 0.042 265.755);
+  --sidebar-border: oklch(0.929 0.013 255.508);
+  --sidebar-ring: oklch(0.704 0.04 256.788);
+}
+
+.dark {
+  --background: oklch(0.129 0.042 264.695);
+  --foreground: oklch(0.984 0.003 247.858);
+  --card: oklch(0.208 0.042 265.755);
+  --card-foreground: oklch(0.984 0.003 247.858);
+  --popover: oklch(0.208 0.042 265.755);
+  --popover-foreground: oklch(0.984 0.003 247.858);
+  --primary: oklch(0.929 0.013 255.508);
+  --primary-foreground: oklch(0.208 0.042 265.755);
+  --secondary: oklch(0.279 0.041 260.031);
+  --secondary-foreground: oklch(0.984 0.003 247.858);
+  --muted: oklch(0.279 0.041 260.031);
+  --muted-foreground: oklch(0.704 0.04 256.788);
+  --accent: oklch(0.279 0.041 260.031);
+  --accent-foreground: oklch(0.984 0.003 247.858);
+  --destructive: oklch(0.643 0.23 26.078);
+  --destructive-foreground: oklch(0.984 0.003 247.858);
+  --border: oklch(0.279 0.041 260.031);
+  --input: oklch(0.279 0.041 260.031);
+  --ring: oklch(0.551 0.027 264.364);
+  --chart-1: oklch(0.627 0.214 259.749);
+  --chart-2: oklch(0.828 0.189 84.429);
+  --chart-3: oklch(0.769 0.188 70.08);
+  --chart-4: oklch(0.828 0.189 84.429);
+  --chart-5: oklch(0.645 0.246 16.439);
+  --sidebar: oklch(0.208 0.042 265.755);
+  --sidebar-foreground: oklch(0.984 0.003 247.858);
+  --sidebar-primary: oklch(0.488 0.243 264.376);
+  --sidebar-primary-foreground: oklch(0.984 0.003 247.858);
+  --sidebar-accent: oklch(0.279 0.041 260.031);
+  --sidebar-accent-foreground: oklch(0.984 0.003 247.858);
+  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-ring: oklch(0.551 0.027 264.364);
+}
+
+@layer base {
+  * {
+    /* Usando CSS padrão para aplicar a variável */
+    border-color: var(--border);
+  }
+
+  body {
+    /* CORRIGIDO: Usando CSS padrão em vez de @apply para aplicar as variáveis */
+    background-color: var(--background);
+    color: var(--foreground);
+  }
+}
+
+/* Correção suave para o Dialog */
+.dialog-overlay {
+  z-index: 50;
+}
+
+.dialog-content {
+  z-index: 51;
+}
+
+/* Correção específica para Dialog do shadcn/ui */
+[data-radix-dialog-overlay] {
+  z-index: 999;
+}
+
+[data-radix-dialog-content] {
+  z-index: 1000;
+}
+
+@layer components {
+  .sidebar-transition {
+    @apply transition-all duration-300 ease-in-out;
+  }
+
+  .nav-item-active {
+    @apply bg-gradient-to-br from-nav-item-active-start to-nav-item-active-end border-l-4 border-primary-blue shadow-sm;
+  }
+
+  .nav-item-hover:hover {
+    @apply bg-gradient-to-br from-nav-item-hover-start to-nav-item-hover-end translate-x-0.5;
+  }
+
+  .status-badge {
+    @apply animate-pulse;
+  }
+
+  /* Utilitários responsivos customizados */
+  .responsive-text-xs {
+    @apply text-xs sm:text-sm;
+  }
+
+  .responsive-text-sm {
+    @apply text-sm md:text-base;
+  }
+
+  .responsive-text-base {
+    @apply text-sm md:text-base lg:text-lg;
+  }
+
+  .responsive-text-lg {
+    @apply text-base md:text-lg lg:text-xl;
+  }
+
+  .responsive-text-xl {
+    @apply text-lg md:text-xl lg:text-2xl;
+  }
+
+  .responsive-text-2xl {
+    @apply text-xl md:text-2xl lg:text-3xl;
+  }
+
+  .responsive-text-3xl {
+    @apply text-2xl md:text-3xl lg:text-4xl;
+  }
+
+  .responsive-padding {
+    @apply p-3 md:p-4 lg:p-6;
+  }
+
+  .responsive-padding-x {
+    @apply px-3 md:px-4 lg:px-6;
+  }
+
+  .responsive-padding-y {
+    @apply py-3 md:py-4 lg:py-6;
+  }
+
+  .responsive-margin {
+    @apply m-3 md:m-4 lg:m-6;
+  }
+
+  .responsive-gap {
+    @apply gap-3 md:gap-4 lg:gap-6;
+  }
+
+  .responsive-rounded {
+    @apply rounded-lg md:rounded-xl;
+  }
+
+  /* Melhorias específicas para mobile */
+  .mobile-scroll {
+    @apply overflow-x-auto;
+  }
+
+  .mobile-card {
+    @apply rounded-lg md:rounded-xl shadow-sm hover:shadow-md transition-shadow duration-200;
+  }
+
+  .mobile-button {
+    @apply px-3 py-2 md:px-4 md:py-2.5 text-sm md:text-base rounded-lg md:rounded-xl;
+  }
+
+  .mobile-input {
+    @apply px-3 py-2 md:px-4 md:py-2.5 text-sm md:text-base rounded-lg md:rounded-xl;
+  }
+
+  /* Grid responsivo otimizado */
+  .responsive-grid-2 {
+    @apply grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4 lg:gap-6;
+  }
+
+  .responsive-grid-3 {
+    @apply grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4 lg:gap-6;
+  }
+
+  .responsive-grid-4 {
+    @apply grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 lg:gap-6;
+  }
+
+  .responsive-grid-6 {
+    @apply grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 md:gap-4 lg:gap-6;
+  }
+
+  /* Flex responsivo */
+  .responsive-flex-col {
+    @apply flex flex-col sm:flex-row items-start sm:items-center gap-3 md:gap-4;
+  }
+
+  .responsive-flex-wrap {
+    @apply flex flex-wrap items-center gap-2 md:gap-3;
+  }
+
+  /* Estados hover otimizados para touch */
+  .touch-friendly {
+    @apply active:scale-95 transition-transform duration-150;
+  }
+
+  @media (hover: hover) {
+    .touch-friendly:hover {
+      @apply scale-[1.02];
+    }
+  }
+
+  /* Scrollbars customizadas */
+  .custom-scrollbar {
+    scrollbar-width: thin;
+    scrollbar-color: rgb(203 213 225) transparent;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    background-color: rgb(203 213 225);
+    border-radius: 3px;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background-color: rgb(148 163 184);
+  }
+}
+
+/* Animations */
+@layer utilities {
+  .animate-fade-in {
+    animation: fadeIn 0.3s ease-in-out;
+  }
+
+  .animate-slide-up {
+    animation: slideUp 0.3s ease-out;
+  }
+
+  .animate-scale-in {
+    animation: scaleIn 0.2s ease-out;
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideUp {
+  from {
+    transform: translateY(10px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes scaleIn {
+  from {
+    transform: scale(0.95);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: .8;
+  }
+}

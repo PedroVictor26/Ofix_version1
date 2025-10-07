@@ -1,0 +1,33 @@
+{
+  "testEnvironment": "node",
+  "testMatch": [
+    "**/tests/**/*.test.js"
+  ],
+  "collectCoverageFrom": [
+    "ofix-backend/src/**/*.js",
+    "src/components/ai/**/*.jsx",
+    "!ofix-backend/src/server.js",
+    "!**/node_modules/**"
+  ],
+  "coverageThreshold": {
+    "global": {
+      "branches": 80,
+      "functions": 80,
+      "lines": 80,
+      "statements": 80
+    }
+  },
+  "setupFilesAfterEnv": ["<rootDir>/tests/setup.js"],
+  "moduleNameMapping": {
+    "^@/(.*)$": "<rootDir>/src/$1",
+    "^@backend/(.*)$": "<rootDir>/ofix-backend/src/$1"
+  },
+  "testTimeout": 10000,
+  "clearMocks": true,
+  "resetMocks": true,
+  "restoreMocks": true,
+  "globals": {
+    "jest": true,
+    "process.env.NODE_ENV": "test"
+  }
+}

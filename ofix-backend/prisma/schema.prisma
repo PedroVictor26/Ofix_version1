@@ -1,0 +1,242 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider     = "postgresql"
+  url          = env("DATABASE_URL")
+  directUrl    = env("DIRECT_DATABASE_URL")
+  relationMode = "prisma"
+}
+
+model User {
+  id        String    @id @default(uuid())
+  nome      String
+  email     String    @unique
+  password  String
+  role      UserRole  @default(ADMIN)
+  oficinaId String?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  oficina   Oficina?  @relation(fields: [oficinaId], references: [id])
+  servicos  Servico[]
+}
+
+model Oficina {
+  id                    String               @id @default(uuid())
+  nome                  String
+  cnpj                  String?              @unique
+  telefone              String?
+  endereco              String?
+  createdAt             DateTime             @default(now())
+  updatedAt             DateTime             @updatedAt
+  users                 User[]
+  clientes              Cliente[]
+  veiculos              Veiculo[]
+  servicos              Servico[]
+  pecas                 Peca[]
+  fornecedores          Fornecedor[]
+  procedimentosPadrao   ProcedimentoPadrao[]
+  mensagensPadrao       MensagemPadrao[]
+  transacoesFinanceiras Financeiro[]
+}
+
+model Cliente {
+  id           String    @id @default(uuid())
+  nomeCompleto String
+  cpfCnpj      String?   @unique
+  telefone     String?
+  email        String?   @unique
+  endereco     String?
+  oficinaId    String
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  oficina      Oficina   @relation(fields: [oficinaId], references: [id])
+  veiculos     Veiculo[]
+  servicos     Servico[]
+}
+
+model Veiculo {
+  id            String    @id @default(uuid())
+  placa         String    @unique
+  marca         String
+  modelo        String
+  anoFabricacao Int?
+  anoModelo     Int?
+  cor           String?
+  chassi        String?   @unique
+  kmAtual       Int?
+  clienteId     String
+  oficinaId     String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  cliente       Cliente   @relation(fields: [clienteId], references: [id])
+  oficina       Oficina?  @relation(fields: [oficinaId], references: [id])
+  servicos      Servico[]
+}
+
+model Servico {
+  id                  String                      @id @default(uuid())
+  numeroOs            String                      @unique
+  status              ServiceStatus               @default(AGUARDANDO)
+  descricaoProblema   String?
+  descricaoSolucao    String?
+  dataEntrada         DateTime                    @default(now())
+  dataPrevisaoEntrega DateTime?
+  dataConclusao       DateTime?
+  dataEntregaCliente  DateTime?
+  valorTotalEstimado  Decimal?
+  valorTotalServicos  Decimal?
+  valorTotalPecas     Decimal?
+  valorTotalFinal     Decimal?
+  kmEntrada           Int?
+  checklist           Json?
+  observacoes         String?
+  clienteId           String?
+  veiculoId           String
+  responsavelId       String?
+  oficinaId           String
+  createdAt           DateTime                    @default(now())
+  updatedAt           DateTime                    @updatedAt
+  cliente             Cliente?                    @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+  veiculo             Veiculo                     @relation(fields: [veiculoId], references: [id])
+  responsavel         User?                       @relation(fields: [responsavelId], references: [id])
+  oficina             Oficina                     @relation(fields: [oficinaId], references: [id])
+  itensPeca           ItemServicoPeca[]
+  procedimentos       ProcedimentoPadraoServico[]
+  mensagens           MensagemServico[]
+}
+
+model Peca {
+  id               String            @id @default(uuid())
+  codigoInterno    String?           @unique
+  codigoFabricante String?
+  nome             String
+  descricao        String?
+  fabricante       String?
+  unidadeMedida    String            @default("UN")
+  precoCusto       Decimal?
+  precoVenda       Decimal
+  estoqueAtual     Int               @default(0)
+  estoqueMinimo    Int?              @default(0)
+  localizacao      String?
+  oficinaId        String
+  fornecedorId     String?
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  oficina          Oficina           @relation(fields: [oficinaId], references: [id])
+  fornecedor       Fornecedor?       @relation(fields: [fornecedorId], references: [id])
+  servicos         ItemServicoPeca[]
+}
+
+model Fornecedor {
+  id        String   @id @default(uuid())
+  nome      String
+  cnpjCpf   String?  @unique
+  telefone  String?
+  email     String?  @unique
+  endereco  String?
+  oficinaId String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  oficina   Oficina  @relation(fields: [oficinaId], references: [id])
+  pecas     Peca[]
+}
+
+model ItemServicoPeca {
+  id                   String   @id @default(uuid())
+  servicoId            String
+  pecaId               String
+  quantidade           Int
+  precoUnitarioCobrado Decimal
+  valorTotal           Decimal
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+  servico              Servico  @relation(fields: [servicoId], references: [id])
+  peca                 Peca     @relation(fields: [pecaId], references: [id])
+
+  @@unique([servicoId, pecaId])
+}
+
+model ProcedimentoPadrao {
+  id                 String                      @id @default(uuid())
+  codigo             String?                     @unique
+  nome               String
+  descricao          String?
+  tempoEstimadoHoras Decimal?
+  checklistJson      Json?
+  oficinaId          String
+  createdAt          DateTime                    @default(now())
+  updatedAt          DateTime                    @updatedAt
+  categoria          String?                     @default("manutencao_preventiva")
+  oficina            Oficina                     @relation(fields: [oficinaId], references: [id])
+  servicos           ProcedimentoPadraoServico[]
+}
+
+model ProcedimentoPadraoServico {
+  id                   String             @id @default(uuid())
+  servicoId            String
+  procedimentoPadraoId String
+  observacoes          String?
+  concluido            Boolean            @default(false)
+  dataConclusao        DateTime?
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+  servico              Servico            @relation(fields: [servicoId], references: [id])
+  procedimentoPadrao   ProcedimentoPadrao @relation(fields: [procedimentoPadraoId], references: [id])
+
+  @@unique([servicoId, procedimentoPadraoId])
+}
+
+model MensagemPadrao {
+  id        String   @id @default(uuid())
+  codigo    String?  @unique
+  nome      String
+  template  String
+  oficinaId String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  categoria String?
+  oficina   Oficina  @relation(fields: [oficinaId], references: [id])
+}
+
+model MensagemServico {
+  id         String   @id @default(uuid())
+  servicoId  String
+  conteudo   String
+  tipoEnvio  String
+  dataEnvio  DateTime @default(now())
+  enviadoPor String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  servico    Servico  @relation(fields: [servicoId], references: [id])
+}
+
+model Financeiro {
+  id        String   @id @default(uuid())
+  descricao String
+  valor     Decimal
+  tipo      String
+  categoria String?
+  data      DateTime
+  servicoId String?
+  oficinaId String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  oficina   Oficina  @relation(fields: [oficinaId], references: [id])
+}
+
+enum UserRole {
+  ADMIN
+  USER
+  GESTOR_OFICINA
+}
+
+enum ServiceStatus {
+  AGUARDANDO
+  EM_ANDAMENTO
+  AGUARDANDO_PECAS
+  AGUARDANDO_APROVACAO
+  FINALIZADO
+  CANCELADO
+}

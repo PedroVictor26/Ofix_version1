@@ -1,0 +1,21 @@
+{
+  "name": "matias-tests",
+  "version": "1.0.0",
+  "description": "Testes automatizados para o Matias",
+  "scripts": {
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
+    "test:integration": "jest --config jest.integration.config.js",
+    "test:e2e": "cypress run",
+    "test:e2e:open": "cypress open"
+  },
+  "devDependencies": {
+    "jest": "^29.0.0",
+    "supertest": "^6.3.0",
+    "cypress": "^12.0.0",
+    "@testing-library/react": "^13.0.0",
+    "@testing-library/jest-dom": "^5.16.0",
+    "jest-environment-jsdom": "^29.0.0"
+  }
+}

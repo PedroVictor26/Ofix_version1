@@ -1,0 +1,118 @@
+# 🚀 DOCKERFILE DE PRODUÇÃO - Sistema Matias
+# Build otimizado para produção com multi-stage
+
+# Stage 1: Build do Frontend
+FROM node:18-alpine AS frontend-builder
+
+WORKDIR /app/frontend
+
+# Copiar package.json e package-lock.json
+COPY package*.json ./
+COPY yarn.lock ./
+
+# Instalar dependências
+RUN yarn install --frozen-lockfile --production=false
+
+# Copiar código fonte do frontend
+COPY src/ ./src/
+COPY public/ ./public/
+COPY index.html ./
+COPY vite.config.ts ./
+COPY tsconfig.json ./
+COPY tsconfig.node.json ./
+COPY tailwind.config.js ./
+COPY postcss.config.js ./
+
+# Build do frontend para produção
+RUN yarn build
+
+# Stage 2: Build do Backend
+FROM node:18-alpine AS backend-builder
+
+WORKDIR /app/backend
+
+# Instalar dependências do sistema
+RUN apk add --no-cache \
+    python3 \
+    make \
+    g++ \
+    cairo-dev \
+    jpeg-dev \
+    pango-dev \
+    musl-dev \
+    giflib-dev \
+    pixman-dev \
+    pangomm-dev \
+    libjpeg-turbo-dev \
+    freetype-dev
+
+# Copiar package.json do backend
+COPY ofix-backend/package*.json ./
+
+# Instalar dependências
+RUN npm ci --only=production && npm cache clean --force
+
+# Stage 3: Produção
+FROM node:18-alpine AS production
+
+# Instalar dependências do sistema para produção
+RUN apk add --no-cache \
+    tini \
+    curl \
+    cairo \
+    jpeg \
+    pango \
+    musl \
+    giflib \
+    pixman \
+    pangomm \
+    libjpeg-turbo \
+    freetype \
+    ffmpeg \
+    && rm -rf /var/cache/apk/*
+
+# Criar usuário não-root
+RUN addgroup -g 1001 -S nodejs && \
+    adduser -S matias -u 1001
+
+# Configurar diretório de trabalho
+WORKDIR /app
+
+# Copiar node_modules do backend builder
+COPY --from=backend-builder --chown=matias:nodejs /app/backend/node_modules ./node_modules
+
+# Copiar código do backend
+COPY --chown=matias:nodejs ofix-backend/src/ ./src/
+COPY --chown=matias:nodejs ofix-backend/package*.json ./
+COPY --chown=matias:nodejs ofix-backend/prisma/ ./prisma/
+
+# Copiar build do frontend
+COPY --from=frontend-builder --chown=matias:nodejs /app/frontend/dist ./public
+
+# Criar diretórios necessários
+RUN mkdir -p /app/logs /app/uploads/audio /app/temp && \
+    chown -R matias:nodejs /app/logs /app/uploads /app/temp
+
+# Gerar Prisma client
+RUN npx prisma generate
+
+# Configurar variáveis de ambiente
+ENV NODE_ENV=production
+ENV PORT=3000
+ENV TZ=America/Sao_Paulo
+
+# Expor porta
+EXPOSE 3000
+
+# Configurar usuário
+USER matias
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD curl -f http://localhost:3000/health || exit 1
+
+# Usar tini como init
+ENTRYPOINT ["/sbin/tini", "--"]
+
+# Comando para iniciar aplicação
+CMD ["node", "src/server.js"]

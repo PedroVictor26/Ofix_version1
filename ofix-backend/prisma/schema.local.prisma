@@ -1,0 +1,377 @@
+// Schema temporário para desenvolvimento local com SQLite
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  ADMIN
+  GESTOR_OFICINA  
+  USER
+}
+
+enum ServiceStatus {
+  AGUARDANDO
+  EM_ANDAMENTO
+  AGUARDANDO_PECAS
+  AGUARDANDO_APROVACAO
+  FINALIZADO
+  CANCELADO
+}
+
+enum UserType {
+  CUSTOMER
+  MECHANIC
+  ADMIN
+}
+
+enum MessageRole {
+  USER
+  ASSISTANT
+}
+
+// Autenticação e Usuários
+model User {
+  id        String   @id @default(uuid())
+  nome      String
+  email     String   @unique
+  password  String
+  role      UserRole @default(ADMIN)
+  oficinaId String?
+  oficina   Oficina? @relation(fields: [oficinaId], references: [id])
+  servicos  Servico[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Oficina {
+  id                   String               @id @default(uuid())
+  nome                 String
+  cnpj                 String?              @unique
+  telefone             String?
+  endereco             String?
+  
+  users                User[]
+  clientes             Cliente[]
+  veiculos             Veiculo[]
+  servicos             Servico[]
+  pecas                Peca[]
+  fornecedores         Fornecedor[]
+  procedimentosPadrao  ProcedimentoPadrao[]
+  mensagensPadrao      MensagemPadrao[]
+  transacoesFinanceiras Financeiro[]
+  
+  // Relacionamentos do Assistente IA
+  conversations        Conversation[]
+  knowledgeEntries     KnowledgeEntry[]
+  conversationAnalytics ConversationAnalytics[]
+
+  createdAt            DateTime             @default(now())
+  updatedAt            DateTime             @updatedAt
+}
+
+// Clientes e Veículos
+model Cliente {
+  id            String    @id @default(uuid())
+  nomeCompleto  String
+  cpfCnpj       String?   @unique
+  telefone      String?
+  email         String?   @unique
+  endereco      String?
+  
+  oficinaId     String
+  oficina       Oficina   @relation(fields: [oficinaId], references: [id])
+
+  veiculos      Veiculo[]
+  servicos      Servico[]
+
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+model Veiculo {
+  id            String    @id @default(uuid())
+  placa         String    @unique
+  marca         String
+  modelo        String
+  anoFabricacao Int?
+  anoModelo     Int?
+  cor           String?
+  chassi        String?   @unique
+  kmAtual       Int?
+
+  clienteId     String
+  cliente       Cliente   @relation(fields: [clienteId], references: [id])
+
+  oficinaId     String?
+  oficina       Oficina?  @relation(fields: [oficinaId], references: [id])
+
+  servicos      Servico[]
+
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+// Serviços
+model Servico {
+  id                  String        @id @default(uuid())
+  numeroOs            String        @unique
+  status              ServiceStatus @default(AGUARDANDO)
+  descricaoProblema   String?
+  descricaoSolucao    String?
+  dataEntrada         DateTime      @default(now())
+  dataPrevisaoEntrega DateTime?
+  dataConclusao       DateTime?
+  dataEntregaCliente  DateTime?
+  valorTotalEstimado  String?
+  valorTotalServicos  String?
+  valorTotalPecas     String?
+  valorTotalFinal     String?
+  kmEntrada           Int?
+  checklist           String?
+  observacoes         String?
+
+  clienteId           String
+  cliente             Cliente       @relation(fields: [clienteId], references: [id])
+
+  veiculoId           String
+  veiculo             Veiculo       @relation(fields: [veiculoId], references: [id])
+
+  responsavelId       String?
+  responsavel         User?         @relation(fields: [responsavelId], references: [id])
+
+  oficinaId           String
+  oficina             Oficina       @relation(fields: [oficinaId], references: [id])
+
+  itensPeca           ItemServicoPeca[]
+  procedimentos       ProcedimentoPadraoServico[]
+  mensagens           MensagemServico[]
+
+  createdAt           DateTime      @default(now())
+  updatedAt           DateTime      @updatedAt
+}
+
+// Peças e Fornecedores
+model Peca {
+  id               String              @id @default(uuid())
+  codigoInterno    String?             @unique
+  codigoFabricante String?
+  nome             String
+  descricao        String?
+  fabricante       String?
+  unidadeMedida    String              @default("UN")
+  precoCusto       String?
+  precoVenda       String
+  estoqueAtual     Int                 @default(0)
+  estoqueMinimo    Int?                @default(0)
+  localizacao      String?
+
+  oficinaId        String
+  oficina          Oficina             @relation(fields: [oficinaId], references: [id])
+
+  fornecedorId     String?
+  fornecedor       Fornecedor?         @relation(fields: [fornecedorId], references: [id])
+
+  servicos         ItemServicoPeca[]
+
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+}
+
+model Fornecedor {
+  id          String   @id @default(uuid())
+  nome        String
+  cnpjCpf     String?  @unique
+  telefone    String?
+  email       String?  @unique
+  endereco    String?
+  
+  oficinaId   String
+  oficina     Oficina  @relation(fields: [oficinaId], references: [id])
+
+  pecas       Peca[]
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// Tabela Pivot para Peças em um Serviço
+model ItemServicoPeca {
+  id                   String  @id @default(uuid())
+  servicoId            String
+  servico              Servico @relation(fields: [servicoId], references: [id])
+
+  pecaId               String
+  peca                 Peca    @relation(fields: [pecaId], references: [id])
+
+  quantidade           Int
+  precoUnitarioCobrado String
+  valorTotal           String
+
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  @@unique([servicoId, pecaId])
+}
+
+// Procedimentos Padrão
+model ProcedimentoPadrao {
+  id                   String   @id @default(uuid())
+  codigo               String?  @unique
+  nome                 String
+  descricao            String?
+  tempoEstimadoHoras   String?
+  checklistJson        String?
+  categoria            String   @default("manutencao_preventiva")
+
+  oficinaId            String
+  oficina              Oficina  @relation(fields: [oficinaId], references: [id])
+
+  servicos             ProcedimentoPadraoServico[]
+
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+}
+
+// Tabela Pivot para Procedimentos em um Serviço
+model ProcedimentoPadraoServico {
+  id                  String             @id @default(uuid())
+  servicoId           String
+  servico             Servico            @relation(fields: [servicoId], references: [id])
+
+  procedimentoPadraoId String
+  procedimentoPadrao  ProcedimentoPadrao @relation(fields: [procedimentoPadraoId], references: [id])
+
+  observacoes         String?
+  concluido           Boolean            @default(false)
+  dataConclusao       DateTime?
+
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+
+  @@unique([servicoId, procedimentoPadraoId])
+}
+
+// Mensagens Padrão e Histórico de Mensagens
+model MensagemPadrao {
+  id          String   @id @default(uuid())
+  codigo      String?  @unique
+  nome        String
+  template    String
+  categoria   String?
+  
+  oficinaId   String
+  oficina     Oficina  @relation(fields: [oficinaId], references: [id])
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model MensagemServico {
+  id          String    @id @default(uuid())
+  servicoId   String
+  servico     Servico   @relation(fields: [servicoId], references: [id])
+
+  conteudo    String
+  tipoEnvio   String
+  dataEnvio   DateTime  @default(now())
+  enviadoPor  String?
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+// Modelo Financeiro
+model Financeiro {
+  id          String    @id @default(uuid())
+  descricao   String
+  valor       String
+  tipo        String // Ex: 'receita', 'despesa'
+  categoria   String?
+  data        DateTime
+  servicoId   String? // Opcional: se a transação estiver ligada a um serviço
+  
+  oficinaId   String
+  oficina     Oficina   @relation(fields: [oficinaId], references: [id])
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+// Modelos para Assistente IA
+model Conversation {
+  id          String   @id @default(uuid())
+  sessionId   String   @unique
+  userId      String
+  userType    UserType
+  startTime   DateTime @default(now())
+  endTime     DateTime?
+  resolved    Boolean  @default(false)
+  satisfaction Int?
+  messages    Message[]
+  metadata    String? // JSON string para dados contextuais
+  
+  oficinaId   String?
+  oficina     Oficina? @relation(fields: [oficinaId], references: [id])
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("conversations")
+}
+
+model Message {
+  id             String       @id @default(uuid())
+  conversationId String
+  role           MessageRole
+  content        String
+  timestamp      DateTime     @default(now())
+  metadata       String?      // JSON string para confidence, sources, etc.
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@map("messages")
+}
+
+model KnowledgeEntry {
+  id            String   @id @default(uuid())
+  category      String   // 'diagnostic', 'procedure', 'faq', 'safety'
+  title         String
+  content       String   // Texto longo
+  tags          String   // JSON array de tags
+  vehicleModels String?  // JSON array de modelos compatíveis
+  confidence    Float    @default(1.0)
+  
+  oficinaId     String?
+  oficina       Oficina? @relation(fields: [oficinaId], references: [id])
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@map("knowledge_entries")
+}
+
+model ConversationAnalytics {
+  id                String   @id @default(uuid())
+  date              DateTime
+  totalConversations Int
+  resolvedCount     Int
+  averageResponseTime Float
+  satisfactionScore Float?
+  topQueries        String   // JSON string
+  
+  oficinaId         String?
+  oficina           Oficina? @relation(fields: [oficinaId], references: [id])
+
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@map("conversation_analytics")
+}
