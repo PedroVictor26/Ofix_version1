@@ -83,6 +83,16 @@ class Application {
   }
 
   setupRoutes() {
+    // Health check endpoint
+    this.server.get('/health', (req, res) => {
+      res.json({ 
+        status: 'OK', 
+        message: 'OFIX Backend funcionando!',
+        timestamp: new Date().toISOString(),
+        environment: process.env.NODE_ENV || 'development'
+      });
+    });
+
     this.server.use('/api', routes);
     this.server.get('/', (req, res) => {
       res.json({ message: 'Bem-vindo à API OFIX!' });
