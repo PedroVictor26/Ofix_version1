@@ -27,7 +27,7 @@ const AIPage = () => {
   const [carregando, setCarregando] = useState(false);
   const [statusConexao, setStatusConexao] = useState('desconectado'); // conectado, conectando, desconectado, erro
   const [sessionId, setSessionId] = useState(null); // Para manter contexto da sessão
-  const [configuracoes, setConfiguracoes] = useState({
+  const [_configuracoes, _setConfiguracoes] = useState({
     agentId: import.meta.env.VITE_AGNO_AGENT_ID || 'agente-ofix',
     apiUrl: import.meta.env.VITE_AGNO_API_URL || 'http://localhost:8000',
     modelo: 'auto'
@@ -131,14 +131,14 @@ const AIPage = () => {
         }
       }
       
-      // Aqui você conectará com seu backend que fará proxy para o Agno
-      const response = await fetch('/api/agno/chat', {
+      // TEMPORÁRIO: Usar endpoint público para teste (sem autenticação)
+      const response = await fetch('/api/agno/chat-public', {
         method: 'POST',
-        headers: authHeaders,
+        headers: {
+          'Content-Type': 'application/json'
+        },
         body: JSON.stringify({
-          message: novaMensagem.conteudo, // Usar conteudo da nova mensagem
-          agent_id: configuracoes.agentId,
-          session_id: sessionId // Manter contexto da sessão
+          message: novaMensagem.conteudo // Usar conteudo da nova mensagem
         })
       });
 
