@@ -31,6 +31,76 @@ router.get('/config', async (req, res) => {
     }
 });
 
+// Endpoint público para testar chat SEM AUTENTICAÇÃO (temporário para debug)
+router.post('/chat-public', async (req, res) => {
+    try {
+        const { message } = req.body;
+        
+        if (!message) {
+            return res.status(400).json({ error: 'Mensagem é obrigatória' });
+        }
+
+        console.log('🧪 Teste público do chat - Configuração:', {
+            agno_url: AGNO_API_URL,
+            configured: AGNO_API_URL !== 'http://localhost:8000',
+            message: message.substring(0, 50) + '...'
+        });
+
+        // Se não está configurado, retornar resposta de demonstração
+        if (AGNO_API_URL === 'http://localhost:8000') {
+            return res.json({
+                success: true,
+                response: `🤖 **Modo Demonstração Ativado**\n\nVocê disse: "${message}"\n\n📋 **Status**: Agente Matias não configurado no ambiente de produção.\n\n⚙️ **Configuração necessária no Render:**\n- AGNO_API_URL=https://matias-agno-assistant.onrender.com\n- AGNO_DEFAULT_AGENT_ID=oficinaia\n\n💡 Após configurar, o assistente conectará com seu agente real!`,
+                mode: 'demo',
+                agno_configured: false
+            });
+        }
+
+        // Testar conexão com Agno real
+        const formData = new FormData();
+        formData.append('message', message);
+        formData.append('stream', 'false');
+        formData.append('user_id', 'test_user');
+
+        const response = await fetch(`${AGNO_API_URL}/agents/oficinaia/runs`, {
+            method: 'POST',
+            headers: {
+                ...formData.getHeaders(),
+                ...(AGNO_API_TOKEN && { 'Authorization': `Bearer ${AGNO_API_TOKEN}` })
+            },
+            body: formData,
+            timeout: 30000
+        });
+
+        if (response.ok) {
+            const data = await response.json();
+            const responseText = data.content || data.response || data.message || 'Resposta do agente Matias';
+            
+            res.json({
+                success: true,
+                response: responseText,
+                mode: 'production',
+                agno_configured: true,
+                metadata: data
+            });
+        } else {
+            const errorData = await response.text();
+            res.status(response.status).json({
+                error: 'Erro na comunicação com Agno',
+                details: errorData,
+                agno_url: AGNO_API_URL
+            });
+        }
+    } catch (err) {
+        console.error('❌ Erro no teste público:', err.message);
+        res.status(500).json({
+            error: 'Erro interno',
+            message: err.message,
+            agno_url: AGNO_API_URL
+        });
+    }
+});
+
 // Middleware para verificar autenticação
 const verificarAuth = (req, res, next) => {
     const token = req.headers.authorization?.replace('Bearer ', '');
