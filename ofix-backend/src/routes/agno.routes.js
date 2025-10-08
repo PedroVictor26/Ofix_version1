@@ -9,6 +9,28 @@ const router = express.Router();
 const AGNO_API_URL = process.env.AGNO_API_URL || 'http://localhost:8000';
 const AGNO_API_TOKEN = process.env.AGNO_API_TOKEN || '';
 
+// Endpoint público para verificar configuração do Agno
+router.get('/config', async (req, res) => {
+    try {
+        console.log('🔧 Verificando configuração do Agno...');
+        
+        res.json({
+            configured: !!AGNO_API_URL && AGNO_API_URL !== 'http://localhost:8000',
+            agno_url: AGNO_API_URL,
+            has_token: !!AGNO_API_TOKEN,
+            agent_id: process.env.AGNO_DEFAULT_AGENT_ID || 'oficinaia',
+            timestamp: new Date().toISOString(),
+            status: AGNO_API_URL === 'http://localhost:8000' ? 'development' : 'production'
+        });
+    } catch (error) {
+        console.error('❌ Erro ao verificar configuração:', error.message);
+        res.status(500).json({
+            error: 'Erro ao verificar configuração',
+            message: error.message
+        });
+    }
+});
+
 // Middleware para verificar autenticação
 const verificarAuth = (req, res, next) => {
     const token = req.headers.authorization?.replace('Bearer ', '');
