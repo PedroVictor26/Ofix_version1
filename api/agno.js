@@ -18,113 +18,45 @@ export default async function handler(req, res) {
   try {
     const { message = '' } = req.body || {};
     
-    // URLs do Agno Service (hardcoded para evitar problemas de env)
+    // URLs do Agno Service (sempre usar o Matias hospedado)
     const AGNO_SERVICE_URL = 'https://matias-agno-assistant.onrender.com';
     const AGNO_AGENT_ID = 'oficinaia';
 
-    // Tentar conectar com o serviço Agno (versão simplificada)
-    try {
-      const agnoResponse = await fetch(`${AGNO_SERVICE_URL}/chat`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          message: message,
-          agent_id: AGNO_AGENT_ID,
-          session_id: `ofix-${Date.now()}`
-        })
-      });
-
-      if (agnoResponse.ok) {
-        const agnoData = await agnoResponse.json();
-        return res.status(200).json({
-          success: true,
-          response: agnoData.response || agnoData.message,
-          source: 'agno-service',
-          timestamp: new Date().toISOString()
-        });
-      }
-    } catch {
-      // Fallback para resposta local se Agno não responder
-    }
-
-    // Fallback - Resposta inteligente local
-    let response = '';
-    const msgLower = message.toLowerCase();
-
-    if (msgLower.includes('orcamento') || msgLower.includes('orçamento')) {
-      response = `🤖 **OFIX Assistant**
-
-📋 **Gestão de Orçamentos:**
-• Acesse "Orçamentos" no menu lateral
-• Clique em "Novo Orçamento" 
-• Adicione serviços e peças
-• Sistema calcula totais automaticamente
-• Converta em ordem de serviço quando aprovado
-
-💡 **Dica:** Use templates para agilizar o processo!`;
-
-    } else if (msgLower.includes('cliente')) {
-      response = `🤖 **OFIX Assistant**
-
-👥 **Cadastro de Clientes:**
-• Menu "Clientes" → "Novo Cliente"
-• Dados essenciais: Nome, telefone, e-mail
-• Histórico automático de serviços
-• Busca rápida por nome ou telefone
-
-📱 **Campos importantes:** CPF, endereço, observações`;
-
-    } else if (msgLower.includes('servico') || msgLower.includes('serviço')) {
-      response = `🤖 **OFIX Assistant**
-
-🔧 **Ordens de Serviço:**
-• Crie a partir de orçamento aprovado
-• Ou diretamente em "Serviços"
-• Status: Pendente → Em Andamento → Concluído
-• Registre tempo e materiais
-
-⚡ **Acompanhamento:** Dashboard mostra progresso em tempo real`;
-
-    } else {
-      response = `🤖 **OFIX Assistant**
-
-Olá! Sou seu assistente virtual do OFIX.
-
-🚗 **Sistema de Gestão para Oficinas**
-• 👥 Gestão de clientes
-• 📋 Orçamentos inteligentes  
-• 🔧 Ordens de serviço
-• 📦 Controle de estoque
-• 📊 Relatórios detalhados
-
-❓ **Como posso ajudar?** Digite sua dúvida sobre qualquer funcionalidade!`;
-    }
-
-    return res.status(200).json({
-      success: true,
-      response: response,
-      source: 'local-fallback',
-      timestamp: new Date().toISOString(),
-      message_received: message
+    // SEMPRE tentar conectar com o serviço Agno hospedado
+    const agnoResponse = await fetch(`${AGNO_SERVICE_URL}/chat`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        message: message,
+        agent_id: AGNO_AGENT_ID,
+        session_id: `ofix-${Date.now()}`
+      })
     });
 
+    if (agnoResponse.ok) {
+      const agnoData = await agnoResponse.json();
+      return res.status(200).json({
+        success: true,
+        response: agnoData.response || agnoData.message,
+        source: 'agno-service',
+        timestamp: new Date().toISOString(),
+        agent_id: AGNO_AGENT_ID
+      });
+    } else {
+      // Se o serviço Agno retornar erro, retornar o erro
+      throw new Error(`Agno service returned status: ${agnoResponse.status}`);
+    }
+
   } catch (error) {
-    return res.status(500).json({
+    // Se houver qualquer erro, retornar erro claro
+    return res.status(503).json({
       success: false,
-      error: 'Erro interno do servidor',
-      details: error.message,
-      fallback_response: `🤖 **OFIX Assistant**
-
-⚠️ Sistema temporariamente indisponível, mas estou aqui!
-
-🚗 **OFIX - Gestão Completa para Oficinas**
-• Clientes, orçamentos e serviços
-• Controle de estoque integrado
-• Relatórios financeiros detalhados
-
-💬 **Tente novamente em alguns instantes**`
+      error: 'Serviço de IA temporariamente indisponível',
+      details: `Não foi possível conectar com o assistente Matias: ${error.message}`,
+      timestamp: new Date().toISOString(),
+      suggestion: 'Tente novamente em alguns instantes'
     });
   }
 }
