@@ -45,8 +45,8 @@ router.use("/financeiro", protectRoute, financeiroRouter);
 // Rotas de Veículos (protegidas)
 router.use("/veiculos", protectRoute, veiculosRouter);
 
-// Rotas do Agno AI Agent (protegidas)
-router.use("/agno", protectRoute, agnoRouter);
+// Rotas do Agno AI Agent (algumas protegidas, outras públicas)
+router.use("/agno", agnoRouter);
 
 // Rotas do Assistente Virtual (AI) - Removidas temporariamente
 // router.use("/ai", aiRouter);
