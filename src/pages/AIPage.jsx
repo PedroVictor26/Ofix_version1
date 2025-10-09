@@ -78,10 +78,13 @@ const AIPage = () => {
         }
       }
       
-      // Aqui você conectará com seu backend que fará proxy para o Agno
-      const response = await fetch('/api/agno/health', {
-        method: 'GET',
-        headers: authHeaders
+      // Testar o endpoint principal do Agno
+      const response = await fetch('/api/agno', {
+        method: 'POST',
+        headers: authHeaders,
+        body: JSON.stringify({
+          message: 'health-check'
+        })
       });
 
       if (response.ok) {
@@ -131,8 +134,8 @@ const AIPage = () => {
         }
       }
       
-      // TEMPORÁRIO: Usar endpoint direto até resolver o agno
-      const response = await fetch('/api/agno-test', {
+      // Usar endpoint principal do Agno (funcionando!)
+      const response = await fetch('/api/agno', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
