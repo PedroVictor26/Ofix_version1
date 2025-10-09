@@ -57,45 +57,67 @@ router.post('/chat-public', async (req, res) => {
         }
 
         // Testar conexão com Agno real
+        console.log('🔌 Tentando conectar com Agno:', AGNO_API_URL);
+        
         const formData = new FormData();
         formData.append('message', message);
         formData.append('stream', 'false');
         formData.append('user_id', 'test_user');
 
-        const response = await fetch(`${AGNO_API_URL}/agents/oficinaia/runs`, {
-            method: 'POST',
-            headers: {
-                ...formData.getHeaders(),
-                ...(AGNO_API_TOKEN && { 'Authorization': `Bearer ${AGNO_API_TOKEN}` })
-            },
-            body: formData,
-            timeout: 30000
-        });
+        try {
+            const response = await fetch(`${AGNO_API_URL}/agents/oficinaia/runs`, {
+                method: 'POST',
+                headers: {
+                    ...formData.getHeaders(),
+                    ...(AGNO_API_TOKEN && { 'Authorization': `Bearer ${AGNO_API_TOKEN}` })
+                },
+                body: formData,
+                timeout: 15000 // 15 segundos
+            });
 
-        if (response.ok) {
-            const data = await response.json();
-            const responseText = data.content || data.response || data.message || 'Resposta do agente Matias';
+            if (response.ok) {
+                const data = await response.json();
+                const responseText = data.content || data.response || data.message || 'Resposta do agente Matias';
+                
+                console.log('✅ Sucesso na comunicação com Agno');
+                res.json({
+                    success: true,
+                    response: responseText,
+                    mode: 'production',
+                    agno_configured: true,
+                    metadata: data
+                });
+            } else {
+                throw new Error(`Agno retornou status ${response.status}`);
+            }
+        } catch (agnoError) {
+            console.error('❌ Erro ao conectar com Agno:', agnoError.message);
+            
+            // FALLBACK: Resposta inteligente baseada na mensagem
+            let fallbackResponse;
+            const msgLower = message.toLowerCase();
+            
+            if (msgLower.includes('serviço') || msgLower.includes('problema') || msgLower.includes('carro')) {
+                fallbackResponse = `🔧 **Assistente OFIX**\n\nVocê mencionou: "${message}"\n\n**Posso ajudar com:**\n• Diagnóstico de problemas automotivos\n• Informações sobre serviços\n• Consulta de peças\n• Agendamento de manutenção\n\n*⚠️ Agente Matias temporariamente indisponível. Respondendo em modo local.*`;
+            } else if (msgLower.includes('preço') || msgLower.includes('valor') || msgLower.includes('custo')) {
+                fallbackResponse = `💰 **Consulta de Preços**\n\nPara "${message}":\n\n**Serviços populares:**\n• Troca de óleo: R$ 80-120\n• Revisão completa: R$ 200-400\n• Diagnóstico: R$ 50-100\n\n*💡 Para valores exatos, consulte nossa equipe.*`;
+            } else {
+                fallbackResponse = `🤖 **OFIX Assistant**\n\nOlá! Você disse: "${message}"\n\n**Como posso ajudar:**\n• Problemas no veículo\n• Informações sobre serviços\n• Consultas de peças\n• Agendamentos\n\n*🔄 Tentando reconectar com agente principal...*`;
+            }
             
             res.json({
                 success: true,
-                response: responseText,
-                mode: 'production',
+                response: fallbackResponse,
+                mode: 'fallback',
                 agno_configured: true,
-                metadata: data
-            });
-        } else {
-            const errorData = await response.text();
-            res.status(response.status).json({
-                error: 'Erro na comunicação com Agno',
-                details: errorData,
-                agno_url: AGNO_API_URL
+                agno_error: agnoError.message
             });
         }
-    } catch (err) {
-        console.error('❌ Erro no teste público:', err.message);
+    } catch (mainError) {
+        console.error('❌ Erro geral no teste público:', mainError.message);
         res.status(500).json({
             error: 'Erro interno',
-            message: err.message,
+            message: mainError.message,
             agno_url: AGNO_API_URL
         });
     }
