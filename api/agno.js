@@ -16,13 +16,13 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { message = '', action = 'chat' } = req.body || {};
+    const { message = '' } = req.body || {};
     
-    // URLs do Agno Service
-    const AGNO_SERVICE_URL = process.env.VITE_AGNO_SERVICE_URL || 'https://matias-agno-assistant.onrender.com';
-    const AGNO_AGENT_ID = process.env.VITE_AGNO_AGENT_ID || 'oficinaia';
+    // URLs do Agno Service (hardcoded para evitar problemas de env)
+    const AGNO_SERVICE_URL = 'https://matias-agno-assistant.onrender.com';
+    const AGNO_AGENT_ID = 'oficinaia';
 
-    // Tentar conectar com o serviço Agno
+    // Tentar conectar com o serviço Agno (versão simplificada)
     try {
       const agnoResponse = await fetch(`${AGNO_SERVICE_URL}/chat`, {
         method: 'POST',
@@ -33,8 +33,7 @@ export default async function handler(req, res) {
           message: message,
           agent_id: AGNO_AGENT_ID,
           session_id: `ofix-${Date.now()}`
-        }),
-        timeout: 10000 // 10 segundos timeout
+        })
       });
 
       if (agnoResponse.ok) {
@@ -46,7 +45,7 @@ export default async function handler(req, res) {
           timestamp: new Date().toISOString()
         });
       }
-    } catch (agnoError) {
+    } catch {
       // Fallback para resposta local se Agno não responder
     }
 
