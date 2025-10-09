@@ -131,8 +131,8 @@ const AIPage = () => {
         }
       }
       
-      // TEMPORÁRIO: Usar endpoint público para teste (sem autenticação)
-      const response = await fetch('/api/agno/chat-public', {
+      // TEMPORÁRIO: Usar endpoint direto até resolver o agno
+      const response = await fetch('/api/agno-test', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
