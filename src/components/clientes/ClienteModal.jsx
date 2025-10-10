@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import InputMask from "react-input-mask";
 import {
   Dialog,
@@ -41,13 +41,20 @@ export default function ClienteModal({ isOpen, onClose, cliente, onSuccess }) {
     }
   }, [formData, cliente]);
 
-  // Hook de navegação por teclado
-  const { focusFirst } = useModalNavigation({
-    isOpen,
-    onClose,
-    hasUnsavedChanges,
-    confirmMessage: "Tem certeza que deseja fechar? As alterações não salvas serão perdidas."
-  });
+  // Hook de navegação por teclado - TEMPORARIAMENTE DESABILITADO
+  // const { focusFirst } = useModalNavigation({
+  //   isOpen,
+  //   onClose,
+  //   hasUnsavedChanges,
+  //   confirmMessage: "Tem certeza que deseja fechar? As alterações não salvas serão perdidas."
+  // });
+
+  // Função simples para focar no primeiro campo
+  const focusFirst = useCallback(() => {
+    setTimeout(() => {
+      nomeInputRef.current?.focus();
+    }, 100);
+  }, []);
 
   // Efeito para inicializar ou resetar o formulário quando o cliente ou o estado de abertura mudam
   useEffect(() => {
