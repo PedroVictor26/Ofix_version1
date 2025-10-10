@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   Dialog,
   DialogContent,
@@ -14,6 +14,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Save, Loader2, AlertCircle } from "lucide-react";
 import { createCliente, updateCliente } from "@/services/clientes.service"; // Importação corrigida
 import { toast } from "react-hot-toast";
+import { getButtonClass } from "@/lib/buttonThemes";
 
 // Um componente de erro reutilizável para os campos do formulário
 const FormError = ({ message }) => (
@@ -27,6 +28,7 @@ export default function ClienteModal({ isOpen, onClose, cliente, onSuccess }) {
   const [errors, setErrors] = useState({});
   const [isSaving, setIsSaving] = useState(false);
   const [formData, setFormData] = useState({});
+  const nomeInputRef = useRef(null);
 
   // Efeito para inicializar ou resetar o formulário quando o cliente ou o estado de abertura mudam
   useEffect(() => {
@@ -39,6 +41,13 @@ export default function ClienteModal({ isOpen, onClose, cliente, onSuccess }) {
         // Adicione outros campos que possam existir no objeto cliente
       });
       setErrors({}); // Limpa os erros ao abrir o modal
+      
+      // Auto-focus no campo nome
+      setTimeout(() => {
+        if (nomeInputRef.current) {
+          nomeInputRef.current.focus();
+        }
+      }, 100);
     }
   }, [isOpen, cliente]);
 
@@ -53,13 +62,25 @@ export default function ClienteModal({ isOpen, onClose, cliente, onSuccess }) {
 
   const validateForm = () => {
     const newErrors = {};
+    
+    // Validação nome
     if (!formData.nome?.trim()) {
       newErrors.nome = "O nome do cliente é obrigatório.";
     }
+    
+    // Validação telefone
     if (!formData.telefone?.trim()) {
       newErrors.telefone = "O telefone é obrigatório.";
     }
-    // Adicione outras validações aqui (ex: email, etc.)
+    
+    // Validação email (se preenchido)
+    if (formData.email?.trim()) {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(formData.email)) {
+        newErrors.email = "Email inválido.";
+      }
+    }
+    
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -129,6 +150,7 @@ export default function ClienteModal({ isOpen, onClose, cliente, onSuccess }) {
           <div className="grid gap-2">
             <Label htmlFor="nome">Nome Completo *</Label>
             <Input
+              ref={nomeInputRef}
               id="nome"
               value={formData.nome || ""}
               onChange={handleInputChange}
@@ -158,7 +180,9 @@ export default function ClienteModal({ isOpen, onClose, cliente, onSuccess }) {
                 value={formData.email || ""}
                 onChange={handleInputChange}
                 placeholder="joao.silva@email.com"
+                className={errors.email ? "border-red-500" : ""}
               />
+              {errors.email && <FormError message={errors.email} />}
             </div>
           </div>
 
@@ -180,10 +204,16 @@ export default function ClienteModal({ isOpen, onClose, cliente, onSuccess }) {
             variant="outline"
             onClick={onClose}
             disabled={isSaving}
+            className={getButtonClass('secondary', 'outline')}
           >
             Cancelar
           </Button>
-          <Button type="submit" onClick={handleSubmit} disabled={isSaving}>
+          <Button 
+            type="submit" 
+            onClick={handleSubmit} 
+            disabled={isSaving}
+            className={getButtonClass('success')}
+          >
             {isSaving ? (
               <>
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" /> Salvando...

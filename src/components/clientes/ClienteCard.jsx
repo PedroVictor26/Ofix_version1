@@ -84,8 +84,9 @@ export function ClienteCard({
                   onEditClick(cliente);
                 }}
                 className="h-9 w-9 rounded-full hover:bg-blue-100 hover:text-blue-600"
+                title="Editar cliente"
               >
-                <Edit className="w-4 h-4" />
+                <Edit className="w-5 h-5" />
               </Button>
               <Button
                 variant="ghost"
@@ -95,8 +96,9 @@ export function ClienteCard({
                   onDeleteClick(cliente);
                 }}
                 className="h-9 w-9 rounded-full hover:bg-red-100 hover:text-red-600"
+                title="Excluir cliente"
               >
-                <Trash2 className="w-4 h-4" />
+                <Trash2 className="w-5 h-5" />
               </Button>
             </div>
           </div>
