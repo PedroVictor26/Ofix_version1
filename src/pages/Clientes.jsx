@@ -16,6 +16,7 @@ import VeiculoModal from "../components/clientes/VeiculoModal";
 import ClienteDetalhes from "../components/clientes/ClienteDetalhes";
 import DeleteClienteDialog from "../components/clientes/DeleteClienteDialog";
 import { deleteCliente } from "../services/clientes.service";
+import Breadcrumbs from "../components/Breadcrumbs";
 
 // Componente de Erro com design refinado
 const ErrorState = ({ error, onRetry }) => (
@@ -161,6 +162,9 @@ export default function Clientes() {
   return (
     <div className="p-2">
       <div className="w-full">
+        {/* Breadcrumbs */}
+        <Breadcrumbs />
+        
         {/* Header */}
         <header className="mb-2">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">

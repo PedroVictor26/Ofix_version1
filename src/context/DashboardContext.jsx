@@ -1,21 +1,28 @@
-import { createContext, useContext, useState } from 'react';
+import { createContext, useContext, useState, useMemo } from 'react';
 
 const DashboardContext = createContext({});
 
 export const DashboardProvider = ({ children }) => {
   const [isNewServiceModalOpen, setNewServiceModalOpen] = useState(false);
   
-  const actions = {
+  // Memoizar actions para evitar re-renders desnecessários
+  const actions = useMemo(() => ({
     openNewServiceModal: () => setNewServiceModalOpen(true),
     closeNewServiceModal: () => setNewServiceModalOpen(false),
-  };
+  }), []);
 
-  const state = {
+  const state = useMemo(() => ({
     isNewServiceModalOpen,
-  };
+  }), [isNewServiceModalOpen]);
+
+  // Memoizar o value do context
+  const contextValue = useMemo(() => ({
+    ...state,
+    ...actions
+  }), [state, actions]);
 
   return (
-    <DashboardContext.Provider value={{ ...state, ...actions }}>
+    <DashboardContext.Provider value={contextValue}>
       {children}
     </DashboardContext.Provider>
   );

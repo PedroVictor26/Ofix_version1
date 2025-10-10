@@ -1,17 +1,19 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import toast from "react-hot-toast";
+import InputMask from "react-input-mask";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { StandardButton, StandardInput } from "@/components/ui";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { createVeiculo } from "../../services/clientes.service";
 import { Save, Car } from "lucide-react";
+import { isValidPlaca } from "../../utils/validation";
+import { useModalNavigation } from "../../hooks/useModalNavigation";
 
 export default function VeiculoModal({
   isOpen,
@@ -28,11 +30,26 @@ export default function VeiculoModal({
   });
 
   const [isSaving, setIsSaving] = useState(false);
+  const [errors, setErrors] = useState({});
+  const placaInputRef = useRef(null);
 
-  // Adicionado para depuração: loga clienteId quando o modal abre
+  // Verifica se há mudanças não salvas
+  const hasUnsavedChanges = useMemo(() => {
+    return Object.values(formData).some(value => 
+      value && value.toString().trim() && value !== new Date().getFullYear()
+    );
+  }, [formData]);
+
+  // Hook de navegação por teclado
+  const { focusFirst } = useModalNavigation({
+    isOpen,
+    onClose,
+    hasUnsavedChanges,
+    confirmMessage: "Tem certeza que deseja fechar? Os dados do veículo serão perdidos."
+  });
+
+  // Auto-focus e reset do formulário
   useEffect(() => {
-    console.log("VeiculoModal aberto. clienteId:", clienteId);
-    // Reseta o formulário quando o modal abre
     if (isOpen) {
       setFormData({
         placa: "",
@@ -41,8 +58,49 @@ export default function VeiculoModal({
         anoFabricacao: new Date().getFullYear(),
         cor: "",
       });
+      setErrors({});
+      
+      // Auto-focus usando o hook
+      focusFirst();
     }
-  }, [isOpen, clienteId]);
+  }, [isOpen, clienteId, focusFirst]);
+
+  // Validação de placa em tempo real
+  const handlePlacaChange = (e) => {
+    const value = e.target.value.toUpperCase();
+    setFormData({ ...formData, placa: value });
+    
+    // Limpa erro se começou a digitar
+    if (errors.placa) {
+      setErrors({ ...errors, placa: null });
+    }
+    
+    // Valida formato se o campo estiver preenchido
+    if (value && !isValidPlaca(value)) {
+      setErrors({ ...errors, placa: 'Placa inválida (use ABC-1234 ou ABC1D23)' });
+    }
+  };
+
+  const validateForm = () => {
+    const newErrors = {};
+    
+    if (!formData.placa?.trim()) {
+      newErrors.placa = 'Placa é obrigatória';
+    } else if (!isValidPlaca(formData.placa)) {
+      newErrors.placa = 'Placa inválida (use ABC-1234 ou ABC1D23)';
+    }
+    
+    if (!formData.marca?.trim()) {
+      newErrors.marca = 'Marca é obrigatória';
+    }
+    
+    if (!formData.modelo?.trim()) {
+      newErrors.modelo = 'Modelo é obrigatório';
+    }
+    
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -54,18 +112,10 @@ export default function VeiculoModal({
       return;
     }
 
-    if (!formData.placa || !formData.marca || !formData.modelo) {
-      toast.error("Preencha os campos obrigatórios: Placa, Marca e Modelo.");
+    if (!validateForm()) {
+      toast.error("Por favor, corrija os erros no formulário.");
       return;
     }
-
-    // Adicionado para depuração: loga os dados antes de enviar
-    console.log(
-      "Enviando dados do veículo. clienteId:",
-      clienteId,
-      "formData:",
-      formData
-    );
 
     setIsSaving(true);
     const toastId = toast.loading("Salvando veículo...");
@@ -107,6 +157,7 @@ export default function VeiculoModal({
       <DialogContent
         className="bg-white text-black dark:bg-white dark:text-black p-6 rounded-xl shadow-xl max-w-3xl"
         aria-describedby="veiculo-modal-description"
+        data-modal-content
       >
         <DialogHeader>
           <DialogTitle className="text-2xl font-bold text-slate-900 flex items-center gap-2">
@@ -122,18 +173,21 @@ export default function VeiculoModal({
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <Label htmlFor="placa">Placa *</Label>
-              <Input
-                id="placa"
+              <InputMask
+                ref={placaInputRef}
+                mask="AAA-9999"
                 value={formData.placa}
-                onChange={(e) =>
-                  setFormData({
-                    ...formData,
-                    placa: e.target.value.toUpperCase(),
-                  })
-                }
+                onChange={handlePlacaChange}
+                className={`flex h-10 w-full rounded-md border px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 ${
+                  errors.placa 
+                    ? 'border-red-500 focus-visible:ring-red-500' 
+                    : 'border-input'
+                }`}
                 placeholder="ABC-1234"
-                required
               />
+              {errors.placa && (
+                <p className="mt-1 text-sm text-red-600">{errors.placa}</p>
+              )}
             </div>
 
             <div>
@@ -160,12 +214,19 @@ export default function VeiculoModal({
               <Input
                 id="marca"
                 value={formData.marca}
-                onChange={(e) =>
-                  setFormData({ ...formData, marca: e.target.value })
-                }
+                onChange={(e) => {
+                  setFormData({ ...formData, marca: e.target.value });
+                  if (errors.marca) {
+                    setErrors({ ...errors, marca: null });
+                  }
+                }}
+                className={errors.marca ? 'border-red-500 focus-visible:ring-red-500' : ''}
                 placeholder="Toyota, Honda, Ford..."
                 required
               />
+              {errors.marca && (
+                <p className="mt-1 text-sm text-red-600">{errors.marca}</p>
+              )}
             </div>
 
             <div>
@@ -173,12 +234,19 @@ export default function VeiculoModal({
               <Input
                 id="modelo"
                 value={formData.modelo}
-                onChange={(e) =>
-                  setFormData({ ...formData, modelo: e.target.value })
-                }
-                placeholder="Corolla, Civic, Fiesta..."
+                onChange={(e) => {
+                  setFormData({ ...formData, modelo: e.target.value });
+                  if (errors.modelo) {
+                    setErrors({ ...errors, modelo: null });
+                  }
+                }}
+                className={errors.modelo ? 'border-red-500 focus-visible:ring-red-500' : ''}
+                placeholder="Corolla, Civic, Focus..."
                 required
               />
+              {errors.modelo && (
+                <p className="mt-1 text-sm text-red-600">{errors.modelo}</p>
+              )}
             </div>
           </div>
 
@@ -195,17 +263,18 @@ export default function VeiculoModal({
           </div>
 
           <div className="flex justify-end gap-3">
-            <Button type="button" variant="outline" onClick={onClose}>
+            <StandardButton variant="secondary" onClick={onClose}>
               Cancelar
-            </Button>
-            <Button
+            </StandardButton>
+            <StandardButton
               type="submit"
+              variant="success"
               disabled={isSaving}
-              className="bg-green-600 hover:bg-green-700"
+              loading={isSaving}
+              icon={Save}
             >
-              <Save className="w-4 h-4 mr-2" />
               {isSaving ? "Salvando..." : "Adicionar Veículo"}
-            </Button>
+            </StandardButton>
           </div>
         </form>
       </DialogContent>

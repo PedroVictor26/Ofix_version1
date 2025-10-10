@@ -1,4 +1,5 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
+import InputMask from "react-input-mask";
 import {
   Dialog,
   DialogContent,
@@ -7,28 +8,45 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { StandardButton, StandardInput } from "@/components/ui";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Save, Loader2, AlertCircle } from "lucide-react";
-import { createCliente, updateCliente } from "@/services/clientes.service"; // Importação corrigida
+import { Save } from "lucide-react";
+import { createCliente, updateCliente } from "@/services/clientes.service";
 import { toast } from "react-hot-toast";
-import { getButtonClass } from "@/lib/buttonThemes";
-
-// Um componente de erro reutilizável para os campos do formulário
-const FormError = ({ message }) => (
-  <div className="flex items-center gap-2 text-sm text-red-600 mt-1">
-    <AlertCircle className="w-4 h-4" />
-    <span>{message}</span>
-  </div>
-);
+import { isValidCPF, isValidEmail } from "../../utils/validation";
+import { useModalNavigation } from "../../hooks/useModalNavigation";
 
 export default function ClienteModal({ isOpen, onClose, cliente, onSuccess }) {
   const [errors, setErrors] = useState({});
   const [isSaving, setIsSaving] = useState(false);
   const [formData, setFormData] = useState({});
   const nomeInputRef = useRef(null);
+
+  // Verifica se há mudanças não salvas
+  const hasUnsavedChanges = useMemo(() => {
+    if (!cliente) {
+      // Novo cliente: verifica se algum campo foi preenchido
+      return Object.values(formData).some(value => value && value.trim());
+    } else {
+      // Editando cliente: verifica se algum campo foi alterado
+      return (
+        formData.nome !== (cliente.nomeCompleto || "") ||
+        formData.telefone !== (cliente.telefone || "") ||
+        formData.email !== (cliente.email || "") ||
+        formData.endereco !== (cliente.endereco || "") ||
+        formData.cpf !== (cliente.cpf || "")
+      );
+    }
+  }, [formData, cliente]);
+
+  // Hook de navegação por teclado
+  const { focusFirst } = useModalNavigation({
+    isOpen,
+    onClose,
+    hasUnsavedChanges,
+    confirmMessage: "Tem certeza que deseja fechar? As alterações não salvas serão perdidas."
+  });
 
   // Efeito para inicializar ou resetar o formulário quando o cliente ou o estado de abertura mudam
   useEffect(() => {
@@ -38,18 +56,61 @@ export default function ClienteModal({ isOpen, onClose, cliente, onSuccess }) {
         telefone: cliente?.telefone || "",
         email: cliente?.email || "",
         endereco: cliente?.endereco || "",
-        // Adicione outros campos que possam existir no objeto cliente
+        cpf: cliente?.cpf || "",
       });
       setErrors({}); // Limpa os erros ao abrir o modal
       
-      // Auto-focus no campo nome
-      setTimeout(() => {
-        if (nomeInputRef.current) {
-          nomeInputRef.current.focus();
-        }
-      }, 100);
+      // Auto-focus no campo nome usando o hook
+      focusFirst();
     }
-  }, [isOpen, cliente]);
+  }, [isOpen, cliente, focusFirst]);
+
+  // Handlers específicos para cada campo com validação em tempo real
+  const handleNomeChange = (e) => {
+    const value = e.target.value;
+    setFormData(prev => ({ ...prev, nome: value }));
+    if (errors.nome) {
+      setErrors(prev => ({ ...prev, nome: null }));
+    }
+  };
+
+  const handleCpfChange = (e) => {
+    const value = e.target.value;
+    setFormData(prev => ({ ...prev, cpf: value }));
+    
+    // Limpa erro se começou a digitar
+    if (errors.cpf) {
+      setErrors(prev => ({ ...prev, cpf: null }));
+    }
+    
+    // Valida CPF em tempo real se preenchido
+    if (value && !isValidCPF(value)) {
+      setErrors(prev => ({ ...prev, cpf: 'CPF inválido' }));
+    }
+  };
+
+  const handleTelefoneChange = (e) => {
+    const value = e.target.value;
+    setFormData(prev => ({ ...prev, telefone: value }));
+    if (errors.telefone) {
+      setErrors(prev => ({ ...prev, telefone: null }));
+    }
+  };
+
+  const handleEmailChange = (e) => {
+    const value = e.target.value;
+    setFormData(prev => ({ ...prev, email: value }));
+    
+    // Limpa erro se começou a digitar
+    if (errors.email) {
+      setErrors(prev => ({ ...prev, email: null }));
+    }
+    
+    // Valida email em tempo real se preenchido
+    if (value && !isValidEmail(value)) {
+      setErrors(prev => ({ ...prev, email: 'Email inválido' }));
+    }
+  };
 
   const handleInputChange = (e) => {
     const { id, value } = e.target;
@@ -66,21 +127,28 @@ export default function ClienteModal({ isOpen, onClose, cliente, onSuccess }) {
     // Validação nome
     if (!formData.nome?.trim()) {
       newErrors.nome = "O nome do cliente é obrigatório.";
+    } else if (formData.nome.trim().length < 2) {
+      newErrors.nome = "O nome deve ter pelo menos 2 caracteres.";
+    }
+    
+    // Validação CPF (se preenchido)
+    if (formData.cpf?.trim() && !isValidCPF(formData.cpf)) {
+      newErrors.cpf = "CPF inválido.";
     }
     
     // Validação telefone
     if (!formData.telefone?.trim()) {
       newErrors.telefone = "O telefone é obrigatório.";
+    } else if (formData.telefone.replace(/\D/g, '').length < 10) {
+      newErrors.telefone = "Telefone deve ter pelo menos 10 dígitos.";
     }
     
     // Validação email (se preenchido)
-    if (formData.email?.trim()) {
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (!emailRegex.test(formData.email)) {
-        newErrors.email = "Email inválido.";
-      }
+    if (formData.email?.trim() && !isValidEmail(formData.email)) {
+      newErrors.email = "Email inválido.";
     }
     
+    setErrors(newErrors);
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -94,9 +162,6 @@ export default function ClienteModal({ isOpen, onClose, cliente, onSuccess }) {
     setIsSaving(true);
 
     try {
-      // --- INÍCIO DA LÓGICA REAL ---
-
-      // --- INÍCIO DA LÓGICA REAL ---
 
       // Preparar dados para envio (remover campo 'nome' e usar apenas 'nomeCompleto')
       const { nome, ...otherData } = formData;
@@ -135,6 +200,7 @@ export default function ClienteModal({ isOpen, onClose, cliente, onSuccess }) {
       <DialogContent
         className="bg-white sm:max-w-lg"
         aria-describedby="cliente-modal-description"
+        data-modal-content
       >
         <DialogHeader>
           <DialogTitle className="text-2xl font-bold text-slate-800">
@@ -147,43 +213,56 @@ export default function ClienteModal({ isOpen, onClose, cliente, onSuccess }) {
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="grid gap-6 py-4">
+          <StandardInput
+            ref={nomeInputRef}
+            label="Nome Completo"
+            required
+            value={formData.nome || ""}
+            onChange={handleNomeChange}
+            placeholder="Ex: João da Silva"
+            error={errors.nome}
+          />
+
           <div className="grid gap-2">
-            <Label htmlFor="nome">Nome Completo *</Label>
-            <Input
-              ref={nomeInputRef}
-              id="nome"
-              value={formData.nome || ""}
-              onChange={handleInputChange}
-              placeholder="Ex: João da Silva"
-              className={errors.nome ? "border-red-500" : ""}
+            <Label htmlFor="cpf">CPF</Label>
+            <InputMask
+              mask="999.999.999-99"
+              value={formData.cpf || ""}
+              onChange={handleCpfChange}
+              className={`flex h-10 w-full rounded-md border px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 ${
+                errors.cpf 
+                  ? 'border-red-500 focus-visible:ring-red-500' 
+                  : 'border-input'
+              }`}
+              placeholder="000.000.000-00"
             />
-            {errors.nome && <FormError message={errors.nome} />}
+            {errors.cpf && <FormError message={errors.cpf} />}
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="grid gap-2">
               <Label htmlFor="telefone">Telefone *</Label>
-              <Input
-                id="telefone"
+              <InputMask
+                mask="(99) 99999-9999"
                 value={formData.telefone || ""}
-                onChange={handleInputChange}
+                onChange={handleTelefoneChange}
+                className={`flex h-10 w-full rounded-md border px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 ${
+                  errors.telefone 
+                    ? 'border-red-500 focus-visible:ring-red-500' 
+                    : 'border-input'
+                }`}
                 placeholder="(11) 99999-9999"
-                className={errors.telefone ? "border-red-500" : ""}
               />
               {errors.telefone && <FormError message={errors.telefone} />}
             </div>
-            <div className="grid gap-2">
-              <Label htmlFor="email">Email</Label>
-              <Input
-                id="email"
-                type="email"
-                value={formData.email || ""}
-                onChange={handleInputChange}
-                placeholder="joao.silva@email.com"
-                className={errors.email ? "border-red-500" : ""}
-              />
-              {errors.email && <FormError message={errors.email} />}
-            </div>
+            <StandardInput
+              type="email"
+              label="Email"
+              value={formData.email || ""}
+              onChange={handleEmailChange}
+              placeholder="joao.silva@email.com"
+              error={errors.email}
+            />
           </div>
 
           <div className="grid gap-2">
@@ -199,31 +278,22 @@ export default function ClienteModal({ isOpen, onClose, cliente, onSuccess }) {
         </form>
 
         <DialogFooter>
-          <Button
-            type="button"
-            variant="outline"
+          <StandardButton
+            variant="secondary"
             onClick={onClose}
             disabled={isSaving}
-            className={getButtonClass('secondary', 'outline')}
           >
             Cancelar
-          </Button>
-          <Button 
-            type="submit" 
+          </StandardButton>
+          <StandardButton 
+            variant="success"
             onClick={handleSubmit} 
             disabled={isSaving}
-            className={getButtonClass('success')}
+            loading={isSaving}
+            icon={Save}
           >
-            {isSaving ? (
-              <>
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" /> Salvando...
-              </>
-            ) : (
-              <>
-                <Save className="w-4 h-4 mr-2" /> Salvar
-              </>
-            )}
-          </Button>
+            {isSaving ? 'Salvando...' : 'Salvar'}
+          </StandardButton>
         </DialogFooter>
       </DialogContent>
     </Dialog>
