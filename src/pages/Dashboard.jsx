@@ -1,7 +1,6 @@
 import { useState, useMemo, useEffect } from "react";
 import { Plus, BarChart3, AlertCircle, RefreshCw, Search, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import {
   DndContext,
   closestCorners,
@@ -231,12 +230,12 @@ export default function Dashboard() {
               <div className="flex items-center gap-4">
                 <div className="relative flex-1">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-slate-400" />
-                  <Input
+                  <input
                     type="text"
                     placeholder="🔍 Buscar por cliente, veículo, placa ou OS # (Ctrl+K)"
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-10 pr-10 py-3 text-sm border-slate-200 focus:border-blue-400 focus:ring-blue-400 rounded-lg"
+                    className="w-full pl-10 pr-10 py-3 text-sm border border-slate-200 focus:border-blue-400 focus:ring-2 focus:ring-blue-400 focus:outline-none rounded-lg"
                   />
                   {searchTerm && (
                     <Button

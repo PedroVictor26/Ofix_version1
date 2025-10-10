@@ -1,6 +1,5 @@
 import { useState, useMemo } from "react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { StandardButton } from "@/components/ui";
 import { Card, CardContent } from "@/components/ui/card";
 import { Plus, Search, User, AlertCircle, RefreshCw } from "lucide-react";
 import toast from "react-hot-toast";
@@ -29,10 +28,9 @@ const ErrorState = ({ error, onRetry }) => (
       <p className="text-slate-500 mb-6">
         Não foi possível carregar os dados. Tente novamente.
       </p>
-      <Button onClick={onRetry} variant="destructive">
-        <RefreshCw className="w-4 h-4 mr-2" />
+      <StandardButton onClick={onRetry} variant="danger" icon={RefreshCw}>
         Tentar Novamente
-      </Button>
+      </StandardButton>
     </div>
   </div>
 );
@@ -49,10 +47,9 @@ const EmptyState = ({ onNewCliente, searchTerm }) => (
         ? "Tente ajustar sua busca."
         : "Clique no botão abaixo para começar."}
     </p>
-    <Button onClick={onNewCliente}>
-      <Plus className="w-4 h-4 mr-2" />
+    <StandardButton onClick={onNewCliente} variant="primary" icon={Plus}>
       Adicionar Novo Cliente
-    </Button>
+    </StandardButton>
   </div>
 );
 
@@ -176,14 +173,13 @@ export default function Clientes() {
                 Visualize, adicione e gerencie seus clientes.
               </p>
             </div>
-            <Button
+            <StandardButton
               onClick={handleNewCliente}
-              size="lg"
-              className="bg-blue-600 hover:bg-blue-700"
+              variant="primary"
+              icon={Plus}
             >
-              <Plus className="w-5 h-5 mr-2" />
               Novo Cliente
-            </Button>
+            </StandardButton>
           </div>
         </header>
 
@@ -191,11 +187,12 @@ export default function Clientes() {
         <div className="mb-2">
           <div className="relative">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 pointer-events-none" />
-            <Input
+            <input
+              type="text"
               placeholder="Buscar por nome, telefone ou email..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-11 pr-4 py-3 text-base h-12 rounded-lg border-slate-300 focus:border-blue-500 focus:ring-blue-500"
+              className="w-full pl-11 pr-4 py-3 text-base h-12 rounded-lg border border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:outline-none"
             />
           </div>
         </div>
