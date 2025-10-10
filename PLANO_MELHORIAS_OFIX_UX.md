@@ -198,7 +198,114 @@ const colors = {
 
 ---
 
-## 🛠️ IMPLEMENTAÇÃO TÉCNICA
+## � **CHECKLIST DE TESTES - VALIDAÇÃO COMPLETA**
+
+### **🎯 Sprint 1: Melhorias Visuais e de Layout**
+- [ ] **Design System**: Verificar se todos os botões usam `StandardButton` com variantes consistentes
+- [ ] **Cores**: Confirmar paleta azul/verde aplicada em toda aplicação
+- [ ] **Tipografia**: Verificar hierarquia visual clara nos títulos e textos
+- [ ] **Breadcrumbs**: Testar navegação em todas as páginas
+- [ ] **Responsividade**: Testar em mobile, tablet e desktop
+
+### **🔧 Sprint 2: Validações Brasileiras**
+- [ ] **CPF**: Testar validação no cadastro de clientes (formato xxx.xxx.xxx-xx)
+- [ ] **CNPJ**: Verificar validação em fornecedores (xx.xxx.xxx/xxxx-xx)
+- [ ] **Telefone**: Testar máscaras (xx) xxxxx-xxxx e (xx) xxxx-xxxx
+- [ ] **CEP**: Validar formato xxxxx-xxx
+- [ ] **Placas**: Testar formatos antigo (ABC-1234) e Mercosul (ABC1D23)
+- [ ] **Mensagens de erro**: Verificar feedbacks em português
+
+### **🧭 Sprint 3: Sistema de Navegação**
+- [ ] **Menu lateral**: Testar expansão/colapso
+- [ ] **Breadcrumbs**: Verificar caminho de navegação em cada página
+- [ ] **Links ativos**: Confirmar highlight da página atual
+- [ ] **Navegação mobile**: Testar menu hamburger
+- [ ] **Transições**: Verificar animações suaves
+
+### **🎨 Sprint 4: Design System Unificado**
+- [ ] **StandardButton**: Testar todas as variantes (primary, success, danger, warning, secondary)
+- [ ] **StandardInput**: Verificar estados (normal, error, success, disabled)
+- [ ] **StandardCard**: Confirmar layout consistente
+- [ ] **Cores uniformes**: Verificar paleta aplicada em todos os componentes
+- [ ] **Iconografia**: Confirmar ícones Lucide React funcionando
+
+### **⚡ Sprint 5: Otimização de Performance**
+- [ ] **Lazy loading**: Verificar carregamento das páginas sob demanda
+- [ ] **Suspense**: Confirmar fallbacks de loading
+- [ ] **Error Boundary**: Testar captura de erros
+- [ ] **Context memoizado**: Verificar performance do AuthContext
+- [ ] **Debouncing**: Testar busca com delay nos campos de pesquisa
+
+### **🔍 Testes Funcionais Específicos**
+
+#### **Dashboard**
+- [ ] Carregamento de estatísticas
+- [ ] Modal de novo serviço (todos os campos)
+- [ ] Integração com IA (Agno Agent)
+- [ ] Gráficos e métricas
+
+#### **Clientes**
+- [ ] Lista de clientes com busca
+- [ ] Cadastro de novo cliente (CPF, telefone, email)
+- [ ] Edição de cliente existente
+- [ ] Exclusão de cliente
+- [ ] Modal de veículo (placa, marca, modelo, ano)
+- [ ] Visualização de detalhes
+
+#### **Estoque**
+- [ ] Lista de peças com filtros
+- [ ] Cadastro de nova peça
+- [ ] Gestão de fornecedores
+- [ ] Busca por SKU/nome
+
+#### **Login/Autenticação**
+- [ ] Login com email/senha
+- [ ] Validação de campos
+- [ ] Redirecionamento após login
+- [ ] Logout
+
+#### **IA Page (Agno Agent)**
+- [ ] Conexão com API do Agno
+- [ ] Chat funcional
+- [ ] Histórico de conversas
+- [ ] Status de conexão
+
+### **📱 Testes de Usabilidade**
+
+#### **Mobile (< 768px)**
+- [ ] Menu hamburger funcional
+- [ ] Cards responsivos
+- [ ] Formulários adaptáveis
+- [ ] Botões com tamanho adequado
+
+#### **Tablet (768px - 1024px)**
+- [ ] Layout em duas colunas
+- [ ] Sidebar adaptável
+- [ ] Grid responsivo
+
+#### **Desktop (> 1024px)**
+- [ ] Sidebar fixa
+- [ ] Layout completo
+- [ ] Hover states
+
+### **🚨 Testes de Erro e Edge Cases**
+- [ ] **ErrorBoundary**: Simular erro JavaScript
+- [ ] **Conexão perdida**: Testar offline
+- [ ] **Campos obrigatórios**: Validar formulários vazios
+- [ ] **Dados inválidos**: Testar CPF/CNPJ incorretos
+- [ ] **Loading states**: Verificar spinners
+- [ ] **404**: Testar rotas inexistentes
+
+### **🎯 Critérios de Aceitação**
+- [ ] **Performance**: Carregamento < 3 segundos
+- [ ] **Acessibilidade**: Navegação por teclado
+- [ ] **SEO**: Meta tags e títulos corretos
+- [ ] **PWA**: Funciona offline (básico)
+- [ ] **Segurança**: Sanitização de inputs
+
+---
+
+## �🛠️ IMPLEMENTAÇÃO TÉCNICA
 
 ### Ferramentas e Bibliotecas Sugeridas:
 ```json
