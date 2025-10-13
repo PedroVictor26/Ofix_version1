@@ -3,10 +3,41 @@ import fetch from 'node-fetch';
 import FormData from 'form-data';
 import jwt from 'jsonwebtoken';
 
-// Importar serviços do Matias
-import ConversasService from '../services/conversas.service.js';
-import AgendamentosService from '../services/agendamentos.service.js';
-import ConsultasOSService from '../services/consultasOS.service.js';
+// Serviços opcionais (para não quebrar se não existirem)
+let ConversasService = null;
+let AgendamentosService = null;
+let ConsultasOSService = null;
+
+// Tentar importar serviços, mas não falhar se não existirem
+Promise.resolve().then(async () => {
+    try {
+        const mod = await import('../services/conversas.service.js');
+        ConversasService = mod.default;
+        console.log('✅ ConversasService carregado');
+    } catch (error) {
+        console.warn('⚠️ ConversasService não disponível');
+    }
+}).catch(() => {});
+
+Promise.resolve().then(async () => {
+    try {
+        const mod = await import('../services/agendamentos.service.js');
+        AgendamentosService = mod.default;
+        console.log('✅ AgendamentosService carregado');
+    } catch (error) {
+        console.warn('⚠️ AgendamentosService não disponível');
+    }
+}).catch(() => {});
+
+Promise.resolve().then(async () => {
+    try {
+        const mod = await import('../services/consultasOS.service.js');
+        ConsultasOSService = mod.default;
+        console.log('✅ ConsultasOSService carregado');
+    } catch (error) {
+        console.warn('⚠️ ConsultasOSService não disponível');
+    }
+}).catch(() => {});
 
 const router = express.Router();
 
@@ -101,20 +132,26 @@ router.post('/chat-matias', async (req, res) => {
             // Salvar conversa no banco OFIX (opcional)
             if (user_id) {
                 try {
-                    await ConversasService.salvarConversa({
-                        usuarioId: user_id,
-                        pergunta: message,
-                        resposta: agentData.response,
-                        contexto: JSON.stringify({
-                            agent: 'matias',
-                            model: agentData.model,
-                            status: agentData.status
-                        }),
-                        timestamp: new Date()
-                    });
-                    console.log('💾 Conversa salva no banco OFIX');
+                    // Tentar salvar conversa, mas não falhar se não conseguir
+                    if (typeof ConversasService?.salvarConversa === 'function') {
+                        await ConversasService.salvarConversa({
+                            usuarioId: user_id,
+                            pergunta: message,
+                            resposta: agentData.response,
+                            contexto: JSON.stringify({
+                                agent: 'matias',
+                                model: agentData.model,
+                                status: agentData.status
+                            }),
+                            timestamp: new Date()
+                        });
+                        console.log('💾 Conversa salva no banco OFIX');
+                    } else {
+                        console.log('📝 ConversasService indisponível, pular log');
+                    }
                 } catch (saveError) {
                     console.warn('⚠️ Erro ao salvar conversa:', saveError.message);
+                    // Não falhar a requisição por causa do log
                 }
             }
 

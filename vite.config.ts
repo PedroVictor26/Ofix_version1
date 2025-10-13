@@ -7,8 +7,27 @@ export default defineConfig({
   plugins: [react()],
   server: {
     proxy: {
-      "/api": "http://localhost:1000",
-      "/agno": "http://localhost:1000",
+      "/api": {
+        target: "https://ofix-backend-prod.onrender.com",
+        changeOrigin: true,
+        secure: true,
+        configure: (proxy, _options) => {
+          proxy.on('error', (err, _req, _res) => {
+            console.log('proxy error', err);
+          });
+          proxy.on('proxyReq', (proxyReq, req, _res) => {
+            console.log('Sending Request to the Target:', req.method, req.url);
+          });
+          proxy.on('proxyRes', (proxyRes, req, _res) => {
+            console.log('Received Response from the Target:', proxyRes.statusCode, req.url);
+          });
+        },
+      },
+      "/agno": {
+        target: "https://ofix-backend-prod.onrender.com",
+        changeOrigin: true,
+        secure: true,
+      },
     },
   },
   resolve: {

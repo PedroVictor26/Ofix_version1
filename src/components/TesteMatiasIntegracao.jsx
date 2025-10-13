@@ -24,6 +24,7 @@ const TesteMatiasIntegracao = () => {
   const testarConexao = async () => {
     try {
       console.log('🔍 Testando conexão com Matias...');
+      console.log('🌐 URL completa:', window.location.origin + '/api/agno/chat-matias');
       
       const response = await fetch('/api/agno/chat-matias', {
         method: 'POST',
@@ -36,18 +37,23 @@ const TesteMatiasIntegracao = () => {
         })
       });
 
+      console.log('📡 Response status:', response.status);
+      console.log('📡 Response headers:', [...response.headers.entries()]);
+
       if (response.ok) {
         const data = await response.json();
+        console.log('📦 Response data:', data);
         if (data.success) {
           setConnectionStatus('connected');
           console.log('✅ Conexão com Matias estabelecida');
         } else {
           setConnectionStatus('error');
-          console.warn('⚠️ Resposta de erro do Matias');
+          console.warn('⚠️ Resposta de erro do Matias:', data);
         }
       } else {
+        const errorText = await response.text();
         setConnectionStatus('error');
-        console.error('❌ Erro na conexão:', response.status);
+        console.error('❌ Erro na conexão:', response.status, errorText);
       }
     } catch (error) {
       setConnectionStatus('error');
@@ -86,9 +92,18 @@ const TesteMatiasIntegracao = () => {
         })
       });
 
-      const data = await response.json();
+      console.log('📊 Response status no envio:', response.status);
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ Response não ok:', response.status, errorText);
+        throw new Error(`HTTP ${response.status}: ${errorText}`);
+      }
 
-      if (response.ok && data.success) {
+      const data = await response.json();
+      console.log('📦 Data recebida:', data);
+
+      if (data.success) {
         // Resposta bem-sucedida
         const assistantMessage = {
           id: Date.now() + 1,
