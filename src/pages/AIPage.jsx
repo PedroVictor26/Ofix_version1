@@ -15,6 +15,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useAuth } from '../context/AuthContext.jsx';
+import { chatWithMatias, testMatiasConnection } from '@/utils/api.js';
 
 /**
  * Página dedicada para interação com o Assistente de IA (Agno Agent)
@@ -56,27 +57,12 @@ const AIPage = () => {
     try {
       setStatusConexao('conectando');
       
-      // Testar conexão com Matias via endpoint OFIX
-      const response = await fetch('/api/agno/chat-matias', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ 
-          message: 'teste de conexão',
-          user_id: `connection_test_${user?.id || 'anonymous'}`
-        })
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        if (data.success) {
-          setStatusConexao('conectado');
-          return true;
-        } else {
-          setStatusConexao('erro');
-          return false;
-        }
+      // Testar conexão com Matias via utilitário API
+      const isConnected = await testMatiasConnection(`connection_test_${user?.id || 'anonymous'}`);
+      
+      if (isConnected) {
+        setStatusConexao('conectado');
+        return true;
       } else {
         setStatusConexao('erro');
         return false;
@@ -91,10 +77,7 @@ const AIPage = () => {
   // Enviar mensagem para o Matias Agent
   const enviarMensagem = async () => {
     if (!mensagem.trim() || carregando) {
-      console.log('⏸️ Envio bloqueado:', { 
-        hasMessage: !!mensagem.trim(), 
-        isLoading: carregando 
-      });
+      // Debug: Envio bloqueado
       return;
     }
 
@@ -111,59 +94,27 @@ const AIPage = () => {
     setCarregando(true);
 
     try {
-      // Logs para debug
-      console.log('🚀 Enviando para Matias:', {
-        url: '/api/agno/chat-matias',
-        method: 'POST',
-        message: mensagemTexto.substring(0, 50),
-        user_id: user?.id || `user_${Date.now()}`
-      });
-
-      // Usar nossa integração com Matias Agent
-      const response = await fetch('/api/agno/chat-matias', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          message: mensagemTexto,
-          user_id: user?.id || `user_${Date.now()}`
-        })
-      });
-
-      console.log('📡 Response recebida:', {
-        status: response.status,
-        statusText: response.statusText,
-        ok: response.ok,
-        headers: Object.fromEntries(response.headers.entries())
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        
-        if (data.success) {
-          const respostaAgente = {
-            id: Date.now() + 1,
-            tipo: 'agente',
-            conteudo: data.response,
-            timestamp: new Date().toISOString(),
-            metadata: {
-              agent: data.agent,
-              model: data.model,
-              status: data.status
-            }
-          };
-
-          setConversas(prev => [...prev, respostaAgente]);
-        } else {
-          throw new Error(data.error || 'Erro na resposta do agente');
+      // Usar nossa integração com Matias Agent via utilitário API
+      const data = await chatWithMatias(
+        mensagemTexto,
+        user?.id || `user_${Date.now()}`
+      );
+      
+      const respostaAgente = {
+        id: Date.now() + 1,
+        tipo: 'agente',
+        conteudo: data.response,
+        timestamp: new Date().toISOString(),
+        metadata: {
+          agent: data.agent,
+          model: data.model,
+          status: data.status
         }
-      } else {
-        const errorText = await response.text();
-        throw new Error(`Erro HTTP ${response.status}: ${errorText}`);
-      }
+      };
+
+      setConversas(prev => [...prev, respostaAgente]);
     } catch (error) {
-      console.error('Erro ao enviar mensagem para Matias:', error);
+      // Erro ao enviar mensagem para Matias
       
       const mensagemErro = {
         id: Date.now() + 1,
@@ -189,6 +140,7 @@ const AIPage = () => {
   // Inicializar conexão
   useEffect(() => {
     verificarConexao();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const getStatusIcon = () => {
