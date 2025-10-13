@@ -26,23 +26,18 @@ const AIPage = () => {
   const [conversas, setConversas] = useState([]);
   const [carregando, setCarregando] = useState(false);
   const [statusConexao, setStatusConexao] = useState('desconectado'); // conectado, conectando, desconectado, erro
-  const [sessionId, setSessionId] = useState(null); // Para manter contexto da sessão
-  const [_configuracoes, _setConfiguracoes] = useState({
-    agentId: import.meta.env.VITE_AGNO_AGENT_ID || 'agente-ofix',
-    apiUrl: import.meta.env.VITE_AGNO_API_URL || 'http://localhost:8000',
-    modelo: 'auto'
-  });
+  // Removidas configurações antigas do Agno - agora usamos Matias diretamente
   
   const chatContainerRef = useRef(null);
   const inputRef = useRef(null);
 
-  // Mensagem inicial do sistema
+  // Mensagem inicial do Matias
   useEffect(() => {
     if (conversas.length === 0) {
       const mensagemInicial = {
         id: Date.now(),
         tipo: 'sistema',
-        conteudo: `Olá ${user?.nome || 'usuário'}! 👋\n\nSou o assistente de IA do OFIX, especializado em:\n\n🔧 Diagnósticos automotivos\n🚗 Gestão de peças e estoque\n💼 Suporte comercial\n📊 Análise de dados operacionais\n\nComo posso ajudá-lo hoje?`,
+        conteudo: `Olá ${user?.nome || 'usuário'}! 👋\n\nEu sou o **Matias**, seu assistente especializado em oficina automotiva! Estou aqui para ajudar com:\n\n🔧 **Diagnósticos técnicos** - Identifique problemas no seu veículo\n� **Orçamentos e preços** - Consulte valores de serviços e peças\n🛠️ **Manutenção preventiva** - Saiba quando fazer revisões\n� **Problemas específicos** - Barulhos, sintomas e soluções\n⚙️ **Especificações técnicas** - Dados de alinhamento, pneus e mais\n\n**Exemplos do que posso responder:**\n• "Quanto custa uma troca de óleo?"\n• "Meu carro está fazendo barulho no motor"\n• "Preciso agendar uma revisão"\n• "Quanto custa pastilhas de freio?"\n\nComo posso ajudá-lo hoje?`,
         timestamp: new Date().toISOString()
       };
       setConversas([mensagemInicial]);
@@ -56,50 +51,44 @@ const AIPage = () => {
     }
   }, [conversas]);
 
-  // Verificar status da conexão com Agno
+  // Verificar status da conexão com Matias Agent
   const verificarConexao = async () => {
     try {
       setStatusConexao('conectando');
       
-      // Buscar token do localStorage usando o mesmo padrão do sistema OFIX
-      const tokenDataString = localStorage.getItem('authToken');
-      let authHeaders = {
-        'Content-Type': 'application/json'
-      };
-      
-      if (tokenDataString) {
-        try {
-          const tokenData = JSON.parse(tokenDataString);
-          if (tokenData && tokenData.token) {
-            authHeaders['Authorization'] = `Bearer ${tokenData.token}`;
-          }
-        } catch (e) {
-          console.error('Erro ao processar token:', e);
-        }
-      }
-      
-      // Testar o endpoint principal do Agno
-      const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:1000';
-      const response = await fetch(`${API_BASE}/agno/contexto-sistema`, {
-        method: 'GET',
-        headers: authHeaders
+      // Testar conexão com Matias via endpoint OFIX
+      const response = await fetch('/api/agno/chat-matias', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ 
+          message: 'teste de conexão',
+          user_id: `connection_test_${user?.id || 'anonymous'}`
+        })
       });
 
       if (response.ok) {
-        setStatusConexao('conectado');
-        return true;
+        const data = await response.json();
+        if (data.success) {
+          setStatusConexao('conectado');
+          return true;
+        } else {
+          setStatusConexao('erro');
+          return false;
+        }
       } else {
         setStatusConexao('erro');
         return false;
       }
     } catch (error) {
-      console.error('Erro ao verificar conexão:', error);
+      console.error('Erro ao verificar conexão com Matias:', error);
       setStatusConexao('erro');
       return false;
     }
   };
 
-  // Enviar mensagem para o agente Agno
+  // Enviar mensagem para o Matias Agent
   const enviarMensagem = async () => {
     if (!mensagem.trim() || carregando) return;
 
@@ -111,85 +100,54 @@ const AIPage = () => {
     };
 
     setConversas(prev => [...prev, novaMensagem]);
+    const mensagemTexto = mensagem;
     setMensagem('');
     setCarregando(true);
 
     try {
-      // Buscar token do localStorage usando o mesmo padrão do sistema OFIX
-      const tokenDataString = localStorage.getItem('authToken');
-      let authHeaders = {
-        'Content-Type': 'application/json'
-      };
-      
-      if (tokenDataString) {
-        try {
-          const tokenData = JSON.parse(tokenDataString);
-          if (tokenData && tokenData.token) {
-            authHeaders['Authorization'] = `Bearer ${tokenData.token}`;
-          }
-        } catch (e) {
-          console.error('Erro ao processar token:', e);
-        }
-      }
-      
-      // Usar endpoint do Agno para chat público (teste)
-      const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:1000';
-      const response = await fetch(`${API_BASE}/agno/chat-public`, {
+      // Usar nossa integração com Matias Agent
+      const response = await fetch('/api/agno/chat-matias', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          message: novaMensagem.conteudo // Usar conteudo da nova mensagem
+          message: mensagemTexto,
+          user_id: user?.id || `user_${Date.now()}`
         })
       });
 
       if (response.ok) {
         const data = await response.json();
         
-        // Extrair o conteúdo da resposta de forma segura
-        let responseContent = '';
-        
-        if (data.success && data.response) {
-          if (typeof data.response === 'string') {
-            responseContent = data.response;
-          } else if (typeof data.response === 'object') {
-            // Se a resposta é um objeto, tentar extrair o conteúdo
-            responseContent = data.response.content || 
-                             data.response.message || 
-                             data.response.output || 
-                             JSON.stringify(data.response, null, 2);
-          } else {
-            responseContent = String(data.response);
-          }
-        } else {
-          responseContent = data.message || 'Resposta recebida do agente.';
-        }
-        
-        const respostaAgente = {
-          id: Date.now() + 1,
-          tipo: 'agente',
-          conteudo: responseContent,
-          timestamp: new Date().toISOString(),
-          metadata: data.metadata || {}
-        };
+        if (data.success) {
+          const respostaAgente = {
+            id: Date.now() + 1,
+            tipo: 'agente',
+            conteudo: data.response,
+            timestamp: new Date().toISOString(),
+            metadata: {
+              agent: data.agent,
+              model: data.model,
+              status: data.status
+            }
+          };
 
-        setConversas(prev => [...prev, respostaAgente]);
-        
-        // Atualizar session_id se retornado
-        if (data.session_id && !sessionId) {
-          setSessionId(data.session_id);
+          setConversas(prev => [...prev, respostaAgente]);
+        } else {
+          throw new Error(data.error || 'Erro na resposta do agente');
         }
       } else {
-        throw new Error(`Erro na API: ${response.status}`);
+        const errorText = await response.text();
+        throw new Error(`Erro HTTP ${response.status}: ${errorText}`);
       }
     } catch (error) {
-      console.error('Erro ao enviar mensagem:', error);
+      console.error('Erro ao enviar mensagem para Matias:', error);
       
       const mensagemErro = {
         id: Date.now() + 1,
         tipo: 'erro',
-        conteudo: 'Desculpe, ocorreu um erro ao processar sua mensagem. Tente novamente em instantes.',
+        conteudo: `Desculpe, ocorreu um problema ao processar sua mensagem.\n\n**Erro:** ${error.message}\n\n**Dica:** Verifique sua conexão e tente novamente.`,
         timestamp: new Date().toISOString()
       };
 
@@ -228,11 +186,11 @@ const AIPage = () => {
   const getStatusText = () => {
     switch (statusConexao) {
       case 'conectado':
-        return 'Agente Online';
+        return 'Matias Online';
       case 'conectando':
-        return 'Conectando...';
+        return 'Conectando ao Matias...';
       case 'erro':
-        return 'Erro de Conexão';
+        return 'Matias Indisponível';
       default:
         return 'Desconectado';
     }
@@ -248,8 +206,8 @@ const AIPage = () => {
               <Brain className="w-6 h-6 text-white" />
             </div>
             <div>
-              <h1 className="text-xl font-bold text-slate-900">Assistente IA OFIX</h1>
-              <p className="text-sm text-slate-600">Powered by Agno AI Agent</p>
+              <h1 className="text-xl font-bold text-slate-900">Matias - Assistente IA</h1>
+              <p className="text-sm text-slate-600">Especialista em Oficina Automotiva • Powered by Groq + LanceDB</p>
             </div>
           </div>
           
@@ -369,7 +327,7 @@ const AIPage = () => {
                 value={mensagem}
                 onChange={(e) => setMensagem(e.target.value)}
                 onKeyPress={handleKeyPress}
-                placeholder="Digite sua pergunta ou solicitação..."
+                placeholder="Pergunte sobre problemas automotivos, preços, diagnósticos..."
                 disabled={carregando || statusConexao !== 'conectado'}
                 className="resize-none border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 rounded-xl"
               />
@@ -390,7 +348,7 @@ const AIPage = () => {
           {statusConexao !== 'conectado' && (
             <div className="mt-2 text-xs text-amber-600 flex items-center gap-1">
               <AlertCircle className="w-3 h-3" />
-              Aguardando conexão com o agente...
+              Aguardando conexão com Matias Agent...
             </div>
           )}
         </div>

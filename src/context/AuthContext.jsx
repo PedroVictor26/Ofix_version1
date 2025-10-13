@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import * as authService from '../services/auth.service.js'; // Nossos serviços de autenticação
 import { useNavigate } from 'react-router-dom'; // Para redirecionamento programático
 
