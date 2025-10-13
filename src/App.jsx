@@ -19,6 +19,7 @@ const Estoque = lazy(() => import('./pages/Estoque.jsx'));
 const Financeiro = lazy(() => import('./pages/Financeiro.jsx'));
 const Configuracoes = lazy(() => import('./pages/Configuracoes.jsx'));
 const AIPage = lazy(() => import('./pages/AIPage.jsx'));
+const TesteMatiasIntegracao = lazy(() => import('./components/TesteMatiasIntegracao.jsx'));
 
 export default function App() {
   return (
@@ -77,6 +78,11 @@ export default function App() {
               <Route path="assistente-ia" element={
                 <Suspense fallback={<LoadingSpinner />}>
                   <AIPage />
+                </Suspense>
+              } />
+              <Route path="teste-matias" element={
+                <Suspense fallback={<LoadingSpinner />}>
+                  <TesteMatiasIntegracao />
                 </Suspense>
               } />
               {/* Você pode ter uma página específica para procedimentos se quiser */}
