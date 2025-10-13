@@ -10,7 +10,8 @@ import {
   Zap,
   AlertCircle,
   CheckCircle,
-  Wrench
+  Wrench,
+  Trash2
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -27,14 +28,99 @@ const AIPage = () => {
   const [conversas, setConversas] = useState([]);
   const [carregando, setCarregando] = useState(false);
   const [statusConexao, setStatusConexao] = useState('desconectado'); // conectado, conectando, desconectado, erro
-  // Removidas configurações antigas do Agno - agora usamos Matias diretamente
   
   const chatContainerRef = useRef(null);
   const inputRef = useRef(null);
 
+  // Chave para localStorage baseada no usuário
+  const getStorageKey = () => `matias_conversas_${user?.id || 'anonymous'}`;
+
+  // Salvar conversas no localStorage
+  const salvarConversas = (novasConversas) => {
+    try {
+      const storageKey = getStorageKey();
+      const dataToSave = {
+        conversas: novasConversas,
+        timestamp: new Date().toISOString(),
+        userId: user?.id || 'anonymous'
+      };
+      localStorage.setItem(storageKey, JSON.stringify(dataToSave));
+    } catch (error) {
+      console.error('Erro ao salvar conversas:', error);
+    }
+  };
+
+  // Carregar conversas do localStorage
+  const carregarConversas = () => {
+    try {
+      const storageKey = getStorageKey();
+      const savedData = localStorage.getItem(storageKey);
+      
+      if (savedData) {
+        const parsedData = JSON.parse(savedData);
+        const savedConversas = parsedData.conversas || [];
+        
+        // Verificar se as conversas não são muito antigas (opcional - 7 dias)
+        const savedTimestamp = new Date(parsedData.timestamp);
+        const ageDays = (new Date() - savedTimestamp) / (1000 * 60 * 60 * 24);
+        
+        if (ageDays < 7 && savedConversas.length > 0) {
+          return savedConversas;
+        }
+      }
+    } catch (error) {
+      console.error('Erro ao carregar conversas:', error);
+    }
+    return null;
+  };
+
+  // Limpar histórico de conversas
+  const limparHistorico = () => {
+    try {
+      const storageKey = getStorageKey();
+      localStorage.removeItem(storageKey);
+      
+      // Recarregar mensagem inicial
+      const mensagemInicial = criarMensagemInicial();
+      setConversas([mensagemInicial]);
+      salvarConversas([mensagemInicial]);
+    } catch (error) {
+      console.error('Erro ao limpar histórico:', error);
+    }
+  };
+
+  // Criar mensagem inicial
+  const criarMensagemInicial = () => ({
+    id: Date.now(),
+    tipo: 'sistema',
+    conteudo: `Olá ${user?.nome || 'usuário'}! 👋\n\nEu sou o **Matias**, seu assistente especializado em oficina automotiva! Estou aqui para ajudar com:\n\n🔧 **Diagnósticos técnicos** - Identifique problemas no seu veículo\n💰 **Orçamentos e preços** - Consulte valores de serviços e peças\n🛠️ **Manutenção preventiva** - Saiba quando fazer revisões\n🔍 **Problemas específicos** - Barulhos, sintomas e soluções\n⚙️ **Especificações técnicas** - Dados de alinhamento, pneus e mais\n\n**Exemplos do que posso responder:**\n• "Quanto custa uma troca de óleo?"\n• "Meu carro está fazendo barulho no motor"\n• "Preciso agendar uma revisão"\n• "Quanto custa pastilhas de freio?"\n\nComo posso ajudá-lo hoje?`,
+    timestamp: new Date().toISOString()
+  });
+
+  // Função helper para adicionar mensagem e salvar automaticamente
+  const adicionarMensagem = (novaMensagem) => {
+    setConversas(prev => {
+      const novasConversas = [...prev, novaMensagem];
+      salvarConversas(novasConversas);
+      return novasConversas;
+    });
+  };
+
   // Mensagem inicial do Matias
   useEffect(() => {
-    if (conversas.length === 0) {
+    if (user && conversas.length === 0) {
+      const conversasSalvas = carregarConversas();
+      
+      if (conversasSalvas && conversasSalvas.length > 0) {
+        // Carregar conversas salvas
+        setConversas(conversasSalvas);
+      } else {
+        // Criar mensagem inicial
+        const mensagemInicial = criarMensagemInicial();
+        setConversas([mensagemInicial]);
+        salvarConversas([mensagemInicial]);
+      }
+    } else if (false) {
       const mensagemInicial = {
         id: Date.now(),
         tipo: 'sistema',
@@ -88,7 +174,7 @@ const AIPage = () => {
       timestamp: new Date().toISOString()
     };
 
-    setConversas(prev => [...prev, novaMensagem]);
+    adicionarMensagem(novaMensagem);
     const mensagemTexto = mensagem;
     setMensagem('');
     setCarregando(true);
@@ -112,7 +198,7 @@ const AIPage = () => {
         }
       };
 
-      setConversas(prev => [...prev, respostaAgente]);
+      adicionarMensagem(respostaAgente);
     } catch (error) {
       // Erro ao enviar mensagem para Matias
       
@@ -123,7 +209,7 @@ const AIPage = () => {
         timestamp: new Date().toISOString()
       };
 
-      setConversas(prev => [...prev, mensagemErro]);
+      adicionarMensagem(mensagemErro);
     } finally {
       setCarregando(false);
     }
@@ -193,17 +279,29 @@ const AIPage = () => {
               </span>
             </div>
             
-            {/* Botão de Configurações */}
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={verificarConexao}
-              disabled={statusConexao === 'conectando'}
-              className="flex items-center gap-2"
-            >
-              <Settings className="w-4 h-4" />
-              Reconectar
-            </Button>
+            {/* Botões de Ação */}
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={limparHistorico}
+                className="flex items-center gap-2 text-red-600 hover:bg-red-50"
+                title="Limpar histórico de conversas"
+              >
+                <Trash2 className="w-4 h-4" />
+                Limpar
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={verificarConexao}
+                disabled={statusConexao === 'conectando'}
+                className="flex items-center gap-2"
+              >
+                <Settings className="w-4 h-4" />
+                Reconectar
+              </Button>
+            </div>
           </div>
         </div>
       </div>
@@ -318,12 +416,17 @@ const AIPage = () => {
             </Button>
           </div>
           
-          {statusConexao !== 'conectado' && (
-            <div className="mt-2 text-xs text-amber-600 flex items-center gap-1">
-              <AlertCircle className="w-3 h-3" />
-              Aguardando conexão com Matias Agent...
+          <div className="mt-2 flex items-center justify-between">
+            {statusConexao !== 'conectado' && (
+              <div className="text-xs text-amber-600 flex items-center gap-1">
+                <AlertCircle className="w-3 h-3" />
+                Aguardando conexão com Matias Agent...
+              </div>
+            )}
+            <div className="text-xs text-slate-500 flex items-center gap-1">
+              💾 Conversas salvas automaticamente
             </div>
-          )}
+          </div>
         </div>
       </div>
     </div>
