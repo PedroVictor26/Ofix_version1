@@ -3,7 +3,7 @@
  * Permite persistir histórico de conversas no banco de dados
  */
 
-import pool from '../config/database.js';
+import prisma from '../config/database.js';
 
 class ConversasIAService {
   /**

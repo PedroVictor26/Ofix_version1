@@ -4,14 +4,14 @@
 
 import express from 'express';
 import conversasIAService from '../services/conversasIA.service.js';
-import { authenticateToken } from '../middlewares/auth.middleware.js';
+import { protectRoute } from '../middlewares/auth.middleware.js';
 
 const router = express.Router();
 
 /**
  * POST /api/conversas/salvar - Salvar nova conversa
  */
-router.post('/salvar', authenticateToken, async (req, res) => {
+router.post('/salvar', protectRoute, async (req, res) => {
   try {
     const { tipo, conteudo, metadata } = req.body;
     const usuarioId = req.user.id;
@@ -52,7 +52,7 @@ router.post('/salvar', authenticateToken, async (req, res) => {
 /**
  * POST /api/conversas/salvar-sessao - Salvar sessão completa de conversas
  */
-router.post('/salvar-sessao', authenticateToken, async (req, res) => {
+router.post('/salvar-sessao', protectRoute, async (req, res) => {
   try {
     const { conversas, sessaoId } = req.body;
     const usuarioId = req.user.id;
@@ -101,7 +101,7 @@ router.post('/salvar-sessao', authenticateToken, async (req, res) => {
 /**
  * GET /api/conversas/historico - Buscar histórico do usuário
  */
-router.get('/historico', authenticateToken, async (req, res) => {
+router.get('/historico', protectRoute, async (req, res) => {
   try {
     const usuarioId = req.user.id;
     const limite = parseInt(req.query.limite) || 50;
@@ -138,7 +138,7 @@ router.get('/historico', authenticateToken, async (req, res) => {
 /**
  * GET /api/conversas/sessao/:sessaoId - Buscar conversas de uma sessão
  */
-router.get('/sessao/:sessaoId', authenticateToken, async (req, res) => {
+router.get('/sessao/:sessaoId', protectRoute, async (req, res) => {
   try {
     const { sessaoId } = req.params;
     const usuarioId = req.user.id;
@@ -166,7 +166,7 @@ router.get('/sessao/:sessaoId', authenticateToken, async (req, res) => {
 /**
  * GET /api/conversas/estatisticas - Obter estatísticas de uso
  */
-router.get('/estatisticas', authenticateToken, async (req, res) => {
+router.get('/estatisticas', protectRoute, async (req, res) => {
   try {
     const usuarioId = req.user.id;
     
@@ -189,7 +189,7 @@ router.get('/estatisticas', authenticateToken, async (req, res) => {
 /**
  * POST /api/conversas/limpar-historico-antigo - Limpar histórico antigo (admin)
  */
-router.post('/limpar-historico-antigo', authenticateToken, async (req, res) => {
+router.post('/limpar-historico-antigo', protectRoute, async (req, res) => {
   try {
     // Verificar se é admin (ajustar conforme sua lógica de autorização)
     if (!req.user.isAdmin) {
