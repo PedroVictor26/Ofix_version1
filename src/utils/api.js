@@ -3,24 +3,35 @@
  * Centraliza a lógica de comunicação com o backend
  */
 
-// Configuração da URL base da API com fallbacks
+// Configuração da URL base da API com fallbacks robustos
 const getApiBaseUrl = () => {
+  // Debug: Log das variáveis disponíveis
+  console.log('🔍 API Utils - Detectando ambiente:', {
+    hasViteEnv: !!import.meta.env,
+    hostname: window.location.hostname,
+    viteApiUrl: import.meta.env?.VITE_API_BASE_URL
+  });
+  
   // Primeiro, tenta usar a variável de ambiente
-  if (import.meta.env.VITE_API_BASE_URL) {
+  if (import.meta.env?.VITE_API_BASE_URL) {
+    console.log('✅ Usando variável de ambiente:', import.meta.env.VITE_API_BASE_URL);
     return import.meta.env.VITE_API_BASE_URL;
   }
   
   // Em produção no Vercel, usar o backend no Render
   if (window.location.hostname === 'ofix.vercel.app') {
+    console.log('✅ Detectado Vercel, usando URL direta');
     return 'https://ofix-backend-prod.onrender.com';
   }
   
   // Em desenvolvimento, usar proxy local
   if (window.location.hostname === 'localhost') {
+    console.log('✅ Detectado localhost, usando proxy');
     return ''; // Usar proxy do Vite
   }
   
   // Fallback padrão
+  console.log('⚠️ Usando fallback padrão');
   return 'https://ofix-backend-prod.onrender.com';
 };
 
