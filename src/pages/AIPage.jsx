@@ -15,7 +15,11 @@ import {
   Mic,
   MicOff,
   Volume2,
-  VolumeX
+  VolumeX,
+  Play,
+  Pause,
+  RotateCcw,
+  Sliders
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -37,6 +41,12 @@ const AIPage = () => {
   const [gravando, setGravando] = useState(false);
   const [vozHabilitada, setVozHabilitada] = useState(true);
   const [falando, setFalando] = useState(false);
+  const [reconhecimentoContinuo, setReconhecimentoContinuo] = useState(false);
+  const [velocidadeVoz, setVelocidadeVoz] = useState(0.9);
+  const [alturaVoz, setAlturaVoz] = useState(1.0);
+  const [vozSelecionada, setVozSelecionada] = useState(null);
+  const [vozesDisponiveis, setVozesDisponiveis] = useState([]);
+  const [painelConfiguracoesAberto, setPainelConfiguracoesAberto] = useState(false);
   
   const chatContainerRef = useRef(null);
   const inputRef = useRef(null);
@@ -108,7 +118,7 @@ const AIPage = () => {
     timestamp: new Date().toISOString()
   });
 
-  // Funções de reconhecimento de voz
+  // Funções de reconhecimento de voz melhoradas
   const iniciarGravacao = () => {
     if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
       alert('Reconhecimento de voz não é suportado neste navegador.');
@@ -119,25 +129,66 @@ const AIPage = () => {
     const recognition = new SpeechRecognition();
 
     recognition.lang = 'pt-BR';
-    recognition.continuous = false;
-    recognition.interimResults = false;
+    recognition.continuous = reconhecimentoContinuo;
+    recognition.interimResults = true;
+    recognition.maxAlternatives = 1;
 
     recognition.onstart = () => {
       setGravando(true);
     };
 
     recognition.onresult = (event) => {
-      const transcript = event.results[0][0].transcript;
-      setMensagem(transcript);
+      let transcript = '';
+      let isFinal = false;
+
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        const result = event.results[i];
+        transcript += result[0].transcript;
+        if (result.isFinal) {
+          isFinal = true;
+        }
+      }
+
+      if (isFinal || !reconhecimentoContinuo) {
+        setMensagem(prev => prev + transcript);
+      } else {
+        // Mostrar resultado temporário em tempo real
+        setMensagem(prev => {
+          const baseText = prev.replace(/\[ouvindo...\].*$/, '');
+          return baseText + (transcript ? `[ouvindo...] ${transcript}` : '');
+        });
+      }
     };
 
     recognition.onerror = (event) => {
       console.error('Erro no reconhecimento de voz:', event.error);
       setGravando(false);
+      
+      if (event.error === 'not-allowed') {
+        alert('Permissão para usar o microfone foi negada. Verifique as configurações do navegador.');
+      }
     };
 
     recognition.onend = () => {
       setGravando(false);
+      
+      // Limpar indicador temporário
+      setMensagem(prev => prev.replace(/\[ouvindo...\].*$/, '').trim());
+      
+      // Reiniciar apenas se modo contínuo estiver ativo E não foi manualmente parado
+      if (reconhecimentoContinuo && !carregando && recognitionRef.current) {
+        // Verificar se o recognition ainda está válido e não foi cancelado
+        setTimeout(() => {
+          if (recognitionRef.current && reconhecimentoContinuo && !falando) {
+            try {
+              recognitionRef.current.start();
+            } catch (error) {
+              console.error('Erro ao reiniciar reconhecimento:', error);
+              setGravando(false);
+            }
+          }
+        }, 500); // Aumentar delay para evitar conflitos
+      }
     };
 
     recognitionRef.current = recognition;
@@ -146,11 +197,19 @@ const AIPage = () => {
 
   const pararGravacao = () => {
     if (recognitionRef.current) {
-      recognitionRef.current.stop();
+      try {
+        recognitionRef.current.stop();
+        recognitionRef.current.abort();
+      } catch (error) {
+        console.error('Erro ao parar reconhecimento:', error);
+      } finally {
+        recognitionRef.current = null;
+        setGravando(false);
+      }
     }
   };
 
-  // Função para síntese de fala
+  // Função melhorada para síntese de fala
   const falarTexto = (texto) => {
     if (!vozHabilitada || !('speechSynthesis' in window)) {
       return;
@@ -160,16 +219,40 @@ const AIPage = () => {
     window.speechSynthesis.cancel();
 
     const utterance = new SpeechSynthesisUtterance(texto);
+    
+    // Configurações avançadas
     utterance.lang = 'pt-BR';
-    utterance.rate = 0.9;
-    utterance.pitch = 1;
+    utterance.rate = velocidadeVoz;
+    utterance.pitch = alturaVoz;
+    utterance.volume = 0.8;
+    
+    // Usar voz selecionada se disponível
+    if (vozSelecionada) {
+      utterance.voice = vozSelecionada;
+    }
 
     utterance.onstart = () => {
       setFalando(true);
+      
+      // Pausar reconhecimento de voz quando o agente começar a falar
+      if (gravando && recognitionRef.current) {
+        try {
+          recognitionRef.current.stop();
+        } catch (error) {
+          // Ignorar erros de parada
+        }
+      }
     };
 
     utterance.onend = () => {
       setFalando(false);
+      
+      // Reiniciar reconhecimento se estava em modo contínuo
+      setTimeout(() => {
+        if (reconhecimentoContinuo && !carregando && vozHabilitada) {
+          iniciarGravacao();
+        }
+      }, 1000); // Aguardar 1 segundo após a fala terminar
     };
 
     utterance.onerror = (event) => {
@@ -177,13 +260,67 @@ const AIPage = () => {
       setFalando(false);
     };
 
-    synthesisRef.current = utterance;
-    window.speechSynthesis.speak(utterance);
+    // Quebrar texto longo em partes menores para melhor síntese
+    const maxLength = 200;
+    if (texto.length > maxLength) {
+      const partes = texto.match(new RegExp(`.{1,${maxLength}}(?:\\s|$)`, 'g')) || [texto];
+      
+      let indiceAtual = 0;
+      const falarProximaParte = () => {
+        if (indiceAtual < partes.length && vozHabilitada) {
+          const parteAtual = new SpeechSynthesisUtterance(partes[indiceAtual].trim());
+          parteAtual.lang = utterance.lang;
+          parteAtual.rate = utterance.rate;
+          parteAtual.pitch = utterance.pitch;
+          parteAtual.volume = utterance.volume;
+          
+          if (vozSelecionada) {
+            parteAtual.voice = vozSelecionada;
+          }
+          
+          parteAtual.onend = () => {
+            indiceAtual++;
+            if (indiceAtual < partes.length && vozHabilitada) {
+              setTimeout(falarProximaParte, 100);
+            } else {
+              setFalando(false);
+              
+              // Reiniciar reconhecimento se estava em modo contínuo
+              setTimeout(() => {
+                if (reconhecimentoContinuo && !carregando && vozHabilitada) {
+                  iniciarGravacao();
+                }
+              }, 1000);
+            }
+          };
+          
+          parteAtual.onerror = () => {
+            setFalando(false);
+          };
+          
+          window.speechSynthesis.speak(parteAtual);
+        }
+      };
+      
+      falarProximaParte();
+    } else {
+      synthesisRef.current = utterance;
+      window.speechSynthesis.speak(utterance);
+    }
   };
 
   const pararFala = () => {
-    window.speechSynthesis.cancel();
+    if (window.speechSynthesis) {
+      window.speechSynthesis.cancel();
+    }
     setFalando(false);
+    
+    // Reiniciar reconhecimento se estava em modo contínuo
+    setTimeout(() => {
+      if (reconhecimentoContinuo && !carregando && vozHabilitada && !gravando) {
+        iniciarGravacao();
+      }
+    }, 500);
   };
 
   const alternarVoz = () => {
@@ -191,6 +328,35 @@ const AIPage = () => {
     if (falando) {
       pararFala();
     }
+  };
+
+  const alternarReconhecimentoContinuo = () => {
+    const novoEstado = !reconhecimentoContinuo;
+    setReconhecimentoContinuo(novoEstado);
+    
+    // Se estiver desativando o modo contínuo, parar gravação imediatamente
+    if (!novoEstado && gravando) {
+      pararGravacao();
+    }
+    
+    // Se estiver ativando e não estiver gravando, não iniciar automaticamente
+    // O usuário precisa clicar no botão de microfone para começar
+  };
+
+  const ajustarVelocidadeVoz = (novaVelocidade) => {
+    setVelocidadeVoz(Math.max(0.1, Math.min(2.0, novaVelocidade)));
+  };
+
+  const ajustarAlturaVoz = (novaAltura) => {
+    setAlturaVoz(Math.max(0.1, Math.min(2.0, novaAltura)));
+  };
+
+  const selecionarVoz = (voz) => {
+    setVozSelecionada(voz);
+  };
+
+  const testarVoz = () => {
+    falarTexto("Olá! Esta é a voz selecionada para o Matias. Como está soando?");
   };
 
   // Função helper para adicionar mensagem e salvar automaticamente
@@ -343,12 +509,54 @@ const AIPage = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Inicializar vozes disponíveis
+  useEffect(() => {
+    const carregarVozes = () => {
+      if ('speechSynthesis' in window) {
+        const vozes = window.speechSynthesis.getVoices();
+        const vozesPt = vozes.filter(voz => 
+          voz.lang.startsWith('pt') || 
+          voz.lang.startsWith('pt-BR') ||
+          voz.name.toLowerCase().includes('portuguese') ||
+          voz.name.toLowerCase().includes('brasil')
+        );
+        
+        setVozesDisponiveis(vozesPt.length > 0 ? vozesPt : vozes.slice(0, 10));
+        
+        // Selecionar voz padrão portuguesa se disponível
+        if (vozesPt.length > 0 && !vozSelecionada) {
+          setVozSelecionada(vozesPt[0]);
+        }
+      }
+    };
+
+    // Carregar vozes imediatamente
+    carregarVozes();
+    
+    // Recarregar quando vozes estiverem disponíveis
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.onvoiceschanged = carregarVozes;
+    }
+
+    return () => {
+      if ('speechSynthesis' in window) {
+        window.speechSynthesis.onvoiceschanged = null;
+      }
+    };
+  }, [vozSelecionada]);
+
   // Limpeza ao desmontar componente
   useEffect(() => {
     return () => {
       // Parar reconhecimento de voz
       if (recognitionRef.current) {
-        recognitionRef.current.stop();
+        try {
+          recognitionRef.current.stop();
+          recognitionRef.current.abort();
+        } catch (error) {
+          // Ignorar erros de limpeza
+        }
+        recognitionRef.current = null;
       }
       
       // Parar síntese de voz
@@ -357,6 +565,13 @@ const AIPage = () => {
       }
     };
   }, []);
+
+  // Parar gravação quando voz for desabilitada
+  useEffect(() => {
+    if (!vozHabilitada && gravando) {
+      pararGravacao();
+    }
+  }, [vozHabilitada, gravando]);
 
   const getStatusIcon = () => {
     switch (statusConexao) {
@@ -420,6 +635,28 @@ const AIPage = () => {
                 <Trash2 className="w-4 h-4" />
                 Limpar
               </Button>
+              
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setPainelConfiguracoesAberto(!painelConfiguracoesAberto)}
+                className="flex items-center gap-2 text-blue-600 hover:bg-blue-50"
+                title="Configurações de voz"
+              >
+                <Sliders className="w-4 h-4" />
+                Configurações
+              </Button>
+              
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {/* TODO: implementar sincronização */}}
+                className="flex items-center gap-2 text-purple-600 hover:bg-purple-50"
+                title="Sincronizar com servidor"
+              >
+                <RotateCcw className="w-4 h-4" />
+                Sync
+              </Button>
               <Button
                 variant="outline"
                 size="sm"
@@ -434,6 +671,184 @@ const AIPage = () => {
           </div>
         </div>
       </div>
+
+      {/* Painel de Configurações Avançadas */}
+      {painelConfiguracoesAberto && (
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200/60 p-6 mb-6">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold text-slate-800">Configurações de Voz</h3>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setPainelConfiguracoesAberto(false)}
+              className="text-slate-500 hover:text-slate-700"
+            >
+              ✕
+            </Button>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {/* Reconhecimento de Voz */}
+            <div className="space-y-3">
+              <h4 className="font-medium text-slate-700">Reconhecimento</h4>
+              
+              <div className="space-y-2">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={reconhecimentoContinuo}
+                    onChange={alternarReconhecimentoContinuo}
+                    className="rounded border-slate-300"
+                  />
+                  <span className={`text-sm ${reconhecimentoContinuo ? 'text-blue-600 font-medium' : 'text-slate-600'}`}>
+                    Modo contínuo {reconhecimentoContinuo && '🔴'}
+                  </span>
+                </label>
+                
+                <p className="text-xs text-slate-500">
+                  No modo contínuo, o microfone reinicia automaticamente após cada fala. 
+                  <strong>Pausa durante as respostas do Matias.</strong>
+                </p>
+              </div>
+            </div>
+
+            {/* Configurações de Voz */}
+            <div className="space-y-3">
+              <h4 className="font-medium text-slate-700">Síntese de Voz</h4>
+              
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-sm text-slate-600 mb-1">
+                    Velocidade: {velocidadeVoz.toFixed(1)}x
+                  </label>
+                  <input
+                    type="range"
+                    min="0.1"
+                    max="2.0"
+                    step="0.1"
+                    value={velocidadeVoz}
+                    onChange={(e) => ajustarVelocidadeVoz(parseFloat(e.target.value))}
+                    className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm text-slate-600 mb-1">
+                    Tom: {alturaVoz.toFixed(1)}
+                  </label>
+                  <input
+                    type="range"
+                    min="0.1"
+                    max="2.0"
+                    step="0.1"
+                    value={alturaVoz}
+                    onChange={(e) => ajustarAlturaVoz(parseFloat(e.target.value))}
+                    className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Seleção de Voz */}
+            <div className="space-y-3">
+              <h4 className="font-medium text-slate-700">Voz do Assistente</h4>
+              
+              <div className="space-y-2">
+                <select
+                  value={vozSelecionada?.name || ''}
+                  onChange={(e) => {
+                    const voz = vozesDisponiveis.find(v => v.name === e.target.value);
+                    selecionarVoz(voz);
+                  }}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm"
+                >
+                  <option value="">Voz padrão do sistema</option>
+                  {vozesDisponiveis.map((voz, index) => (
+                    <option key={index} value={voz.name}>
+                      {voz.name} ({voz.lang})
+                    </option>
+                  ))}
+                </select>
+                
+                <div className="flex gap-2">
+                  <Button
+                    onClick={testarVoz}
+                    disabled={falando}
+                    size="sm"
+                    variant="outline"
+                    className="flex items-center gap-1 text-xs"
+                  >
+                    <Play className="w-3 h-3" />
+                    Testar
+                  </Button>
+                  
+                  <Button
+                    onClick={() => {
+                      setVelocidadeVoz(0.9);
+                      setAlturaVoz(1.0);
+                      setVozSelecionada(null);
+                    }}
+                    size="sm"
+                    variant="outline"
+                    className="flex items-center gap-1 text-xs"
+                  >
+                    <RotateCcw className="w-3 h-3" />
+                    Padrão
+                  </Button>
+                </div>
+              </div>
+            </div>
+            
+            {/* Seção de Estatísticas e Sincronização */}
+            <div className="col-span-full mt-6 pt-6 border-t border-slate-200">
+              <h4 className="font-medium text-slate-700 mb-4">Dados e Sincronização</h4>
+              
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="bg-slate-50 rounded-lg p-4">
+                  <div className="text-2xl font-bold text-slate-800">{conversas.length}</div>
+                  <div className="text-sm text-slate-600">Conversas na sessão atual</div>
+                </div>
+                
+                <div className="bg-blue-50 rounded-lg p-4">
+                  <div className="text-2xl font-bold text-blue-800">
+                    {conversas.filter(c => c.tipo === 'usuario').length}
+                  </div>
+                  <div className="text-sm text-blue-600">Suas mensagens</div>
+                </div>
+                
+                <div className="bg-green-50 rounded-lg p-4">
+                  <div className="text-2xl font-bold text-green-800">
+                    {conversas.filter(c => c.tipo === 'agente').length}
+                  </div>
+                  <div className="text-sm text-green-600">Respostas do Matias</div>
+                </div>
+              </div>
+              
+              <div className="flex gap-2 mt-4">
+                <Button
+                  onClick={() => {/* TODO: implementar carregamento */}}
+                  variant="outline"
+                  size="sm"
+                  className="flex items-center gap-2"
+                >
+                  <RotateCcw className="w-3 h-3" />
+                  Carregar do Servidor
+                </Button>
+                
+                <Button
+                  onClick={() => {/* TODO: implementar salvamento */}}
+                  variant="outline"
+                  size="sm"
+                  className="flex items-center gap-2"
+                >
+                  <Sliders className="w-3 h-3" />
+                  Salvar no Servidor
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Área de Chat */}
       <div className="flex-1 bg-white rounded-xl shadow-sm border border-slate-200/60 flex flex-col overflow-hidden">
@@ -549,7 +964,7 @@ const AIPage = () => {
                 variant="outline"
                 size="sm"
                 className={`rounded-xl ${vozHabilitada ? 'bg-green-50 border-green-300 text-green-700 hover:bg-green-100' : 'bg-gray-50 border-gray-300 text-gray-500 hover:bg-gray-100'}`}
-                title={vozHabilitada ? 'Desativar voz' : 'Ativar voz'}
+                title={vozHabilitada ? 'Desativar síntese de voz' : 'Ativar síntese de voz'}
               >
                 {vozHabilitada ? (
                   <Volume2 className="w-4 h-4" />
@@ -564,26 +979,29 @@ const AIPage = () => {
                   onClick={pararFala}
                   variant="outline"
                   size="sm"
-                  className="rounded-xl bg-red-50 border-red-300 text-red-700 hover:bg-red-100"
-                  title="Parar fala"
+                  className="rounded-xl bg-red-50 border-red-300 text-red-700 hover:bg-red-100 animate-pulse"
+                  title="Parar fala atual"
                 >
-                  <VolumeX className="w-4 h-4" />
+                  <Pause className="w-4 h-4" />
                 </Button>
               )}
 
-              {/* Botão de gravação */}
+              {/* Botão de gravação com indicador de modo */}
               <Button
                 onClick={gravando ? pararGravacao : iniciarGravacao}
                 variant="outline"
                 size="sm"
                 disabled={carregando}
-                className={`rounded-xl ${gravando ? 'bg-red-50 border-red-300 text-red-700 hover:bg-red-100 animate-pulse' : 'bg-gray-50 border-gray-300 text-gray-700 hover:bg-gray-100'}`}
-                title={gravando ? 'Parar gravação' : 'Iniciar gravação de voz'}
+                className={`rounded-xl relative ${gravando ? 'bg-red-50 border-red-300 text-red-700 hover:bg-red-100 animate-pulse' : 'bg-gray-50 border-gray-300 text-gray-700 hover:bg-gray-100'}`}
+                title={gravando ? 'Parar gravação' : `Iniciar gravação${reconhecimentoContinuo ? ' (modo contínuo)' : ''}`}
               >
                 {gravando ? (
                   <MicOff className="w-4 h-4" />
                 ) : (
                   <Mic className="w-4 h-4" />
+                )}
+                {reconhecimentoContinuo && (
+                  <div className="absolute -top-1 -right-1 w-2 h-2 bg-blue-500 rounded-full"></div>
                 )}
               </Button>
             </div>

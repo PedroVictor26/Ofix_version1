@@ -3,6 +3,7 @@ import cors from 'cors';
 import 'dotenv/config';
 import routes from './routes/index.js';
 import agnoRoutes from './routes/agno.routes.js';
+import conversasIARoutes from './routes/conversasIA.routes.js';
 import { securityHeaders, rateLimit } from './middlewares/security.middleware.js';
 import { sanitizeInput } from './middlewares/validation.middleware.js';
 
@@ -96,6 +97,7 @@ class Application {
 
     this.server.use('/api', routes);
     this.server.use('/agno', agnoRoutes);
+    this.server.use('/api/conversas', conversasIARoutes);
     this.server.get('/', (req, res) => {
       res.json({ message: 'Bem-vindo à API OFIX!' });
     });
