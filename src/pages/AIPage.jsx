@@ -90,7 +90,13 @@ const AIPage = () => {
 
   // Enviar mensagem para o Matias Agent
   const enviarMensagem = async () => {
-    if (!mensagem.trim() || carregando) return;
+    if (!mensagem.trim() || carregando) {
+      console.log('⏸️ Envio bloqueado:', { 
+        hasMessage: !!mensagem.trim(), 
+        isLoading: carregando 
+      });
+      return;
+    }
 
     const novaMensagem = {
       id: Date.now(),
@@ -105,6 +111,14 @@ const AIPage = () => {
     setCarregando(true);
 
     try {
+      // Logs para debug
+      console.log('🚀 Enviando para Matias:', {
+        url: '/api/agno/chat-matias',
+        method: 'POST',
+        message: mensagemTexto.substring(0, 50),
+        user_id: user?.id || `user_${Date.now()}`
+      });
+
       // Usar nossa integração com Matias Agent
       const response = await fetch('/api/agno/chat-matias', {
         method: 'POST',
@@ -115,6 +129,13 @@ const AIPage = () => {
           message: mensagemTexto,
           user_id: user?.id || `user_${Date.now()}`
         })
+      });
+
+      console.log('📡 Response recebida:', {
+        status: response.status,
+        statusText: response.statusText,
+        ok: response.ok,
+        headers: Object.fromEntries(response.headers.entries())
       });
 
       if (response.ok) {
