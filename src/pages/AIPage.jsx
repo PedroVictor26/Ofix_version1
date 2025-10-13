@@ -11,7 +11,11 @@ import {
   AlertCircle,
   CheckCircle,
   Wrench,
-  Trash2
+  Trash2,
+  Mic,
+  MicOff,
+  Volume2,
+  VolumeX
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -29,8 +33,15 @@ const AIPage = () => {
   const [carregando, setCarregando] = useState(false);
   const [statusConexao, setStatusConexao] = useState('desconectado'); // conectado, conectando, desconectado, erro
   
+  // Estados para funcionalidades de voz
+  const [gravando, setGravando] = useState(false);
+  const [vozHabilitada, setVozHabilitada] = useState(true);
+  const [falando, setFalando] = useState(false);
+  
   const chatContainerRef = useRef(null);
   const inputRef = useRef(null);
+  const recognitionRef = useRef(null);
+  const synthesisRef = useRef(null);
 
   // Chave para localStorage baseada no usuário
   const getStorageKey = () => `matias_conversas_${user?.id || 'anonymous'}`;
@@ -96,6 +107,91 @@ const AIPage = () => {
     conteudo: `Olá ${user?.nome || 'usuário'}! 👋\n\nEu sou o **Matias**, seu assistente especializado em oficina automotiva! Estou aqui para ajudar com:\n\n🔧 **Diagnósticos técnicos** - Identifique problemas no seu veículo\n💰 **Orçamentos e preços** - Consulte valores de serviços e peças\n🛠️ **Manutenção preventiva** - Saiba quando fazer revisões\n🔍 **Problemas específicos** - Barulhos, sintomas e soluções\n⚙️ **Especificações técnicas** - Dados de alinhamento, pneus e mais\n\n**Exemplos do que posso responder:**\n• "Quanto custa uma troca de óleo?"\n• "Meu carro está fazendo barulho no motor"\n• "Preciso agendar uma revisão"\n• "Quanto custa pastilhas de freio?"\n\nComo posso ajudá-lo hoje?`,
     timestamp: new Date().toISOString()
   });
+
+  // Funções de reconhecimento de voz
+  const iniciarGravacao = () => {
+    if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+      alert('Reconhecimento de voz não é suportado neste navegador.');
+      return;
+    }
+
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const recognition = new SpeechRecognition();
+
+    recognition.lang = 'pt-BR';
+    recognition.continuous = false;
+    recognition.interimResults = false;
+
+    recognition.onstart = () => {
+      setGravando(true);
+    };
+
+    recognition.onresult = (event) => {
+      const transcript = event.results[0][0].transcript;
+      setMensagem(transcript);
+    };
+
+    recognition.onerror = (event) => {
+      console.error('Erro no reconhecimento de voz:', event.error);
+      setGravando(false);
+    };
+
+    recognition.onend = () => {
+      setGravando(false);
+    };
+
+    recognitionRef.current = recognition;
+    recognition.start();
+  };
+
+  const pararGravacao = () => {
+    if (recognitionRef.current) {
+      recognitionRef.current.stop();
+    }
+  };
+
+  // Função para síntese de fala
+  const falarTexto = (texto) => {
+    if (!vozHabilitada || !('speechSynthesis' in window)) {
+      return;
+    }
+
+    // Para qualquer fala em andamento
+    window.speechSynthesis.cancel();
+
+    const utterance = new SpeechSynthesisUtterance(texto);
+    utterance.lang = 'pt-BR';
+    utterance.rate = 0.9;
+    utterance.pitch = 1;
+
+    utterance.onstart = () => {
+      setFalando(true);
+    };
+
+    utterance.onend = () => {
+      setFalando(false);
+    };
+
+    utterance.onerror = (event) => {
+      console.error('Erro na síntese de voz:', event.error);
+      setFalando(false);
+    };
+
+    synthesisRef.current = utterance;
+    window.speechSynthesis.speak(utterance);
+  };
+
+  const pararFala = () => {
+    window.speechSynthesis.cancel();
+    setFalando(false);
+  };
+
+  const alternarVoz = () => {
+    setVozHabilitada(!vozHabilitada);
+    if (falando) {
+      pararFala();
+    }
+  };
 
   // Função helper para adicionar mensagem e salvar automaticamente
   const adicionarMensagem = (novaMensagem) => {
@@ -199,6 +295,24 @@ const AIPage = () => {
       };
 
       adicionarMensagem(respostaAgente);
+      
+      // Falar resposta automaticamente se voz estiver habilitada
+      if (vozHabilitada && data.response) {
+        // Remover markdown básico para melhor síntese de voz
+        const textoLimpo = data.response
+          .replace(/\*\*(.*?)\*\*/g, '$1') // Remove **bold**
+          .replace(/\*(.*?)\*/g, '$1') // Remove *italic*
+          .replace(/#{1,6}\s/g, '') // Remove headers #
+          .replace(/```[\s\S]*?```/g, '') // Remove code blocks
+          .replace(/`([^`]+)`/g, '$1') // Remove inline code
+          .replace(/\n{2,}/g, '. ') // Converte quebras duplas em pausa
+          .replace(/\n/g, ' ') // Converte quebras simples em espaço
+          .trim();
+          
+        if (textoLimpo.length > 0) {
+          falarTexto(textoLimpo);
+        }
+      }
     } catch (error) {
       // Erro ao enviar mensagem para Matias
       
@@ -227,6 +341,21 @@ const AIPage = () => {
   useEffect(() => {
     verificarConexao();
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Limpeza ao desmontar componente
+  useEffect(() => {
+    return () => {
+      // Parar reconhecimento de voz
+      if (recognitionRef.current) {
+        recognitionRef.current.stop();
+      }
+      
+      // Parar síntese de voz
+      if (window.speechSynthesis) {
+        window.speechSynthesis.cancel();
+      }
+    };
   }, []);
 
   const getStatusIcon = () => {
@@ -351,6 +480,14 @@ const AIPage = () => {
                     : 'bg-gradient-to-r from-red-50 to-orange-50 text-red-800 border border-red-200'
                 }`}
               >
+                {/* Indicador de fala para mensagens do agente */}
+                {conversa.tipo === 'agente' && falando && (
+                  <div className="flex items-center gap-2 mb-2 text-blue-600">
+                    <Volume2 className="w-3 h-3 animate-pulse" />
+                    <span className="text-xs">Falando...</span>
+                  </div>
+                )}
+                
                 <div className="whitespace-pre-wrap text-sm leading-relaxed">
                   {conversa.conteudo}
                 </div>
@@ -403,6 +540,54 @@ const AIPage = () => {
                 className="resize-none border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 rounded-xl"
               />
             </div>
+            
+            {/* Botões de controle de voz */}
+            <div className="flex gap-2">
+              {/* Botão para ativar/desativar voz */}
+              <Button
+                onClick={alternarVoz}
+                variant="outline"
+                size="sm"
+                className={`rounded-xl ${vozHabilitada ? 'bg-green-50 border-green-300 text-green-700 hover:bg-green-100' : 'bg-gray-50 border-gray-300 text-gray-500 hover:bg-gray-100'}`}
+                title={vozHabilitada ? 'Desativar voz' : 'Ativar voz'}
+              >
+                {vozHabilitada ? (
+                  <Volume2 className="w-4 h-4" />
+                ) : (
+                  <VolumeX className="w-4 h-4" />
+                )}
+              </Button>
+
+              {/* Botão para parar fala atual */}
+              {falando && (
+                <Button
+                  onClick={pararFala}
+                  variant="outline"
+                  size="sm"
+                  className="rounded-xl bg-red-50 border-red-300 text-red-700 hover:bg-red-100"
+                  title="Parar fala"
+                >
+                  <VolumeX className="w-4 h-4" />
+                </Button>
+              )}
+
+              {/* Botão de gravação */}
+              <Button
+                onClick={gravando ? pararGravacao : iniciarGravacao}
+                variant="outline"
+                size="sm"
+                disabled={carregando}
+                className={`rounded-xl ${gravando ? 'bg-red-50 border-red-300 text-red-700 hover:bg-red-100 animate-pulse' : 'bg-gray-50 border-gray-300 text-gray-700 hover:bg-gray-100'}`}
+                title={gravando ? 'Parar gravação' : 'Iniciar gravação de voz'}
+              >
+                {gravando ? (
+                  <MicOff className="w-4 h-4" />
+                ) : (
+                  <Mic className="w-4 h-4" />
+                )}
+              </Button>
+            </div>
+
             <Button
               onClick={enviarMensagem}
               disabled={!mensagem.trim() || carregando || statusConexao !== 'conectado'}
