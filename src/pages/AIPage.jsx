@@ -79,7 +79,8 @@ const AIPage = () => {
       }
       
       // Testar o endpoint principal do Agno
-      const response = await fetch('/agno/contexto-sistema', {
+      const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:1000';
+      const response = await fetch(`${API_BASE}/agno/contexto-sistema`, {
         method: 'GET',
         headers: authHeaders
       });
@@ -132,7 +133,8 @@ const AIPage = () => {
       }
       
       // Usar endpoint do Agno para chat público (teste)
-      const response = await fetch('/agno/chat-public', {
+      const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:1000';
+      const response = await fetch(`${API_BASE}/agno/chat-public`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
