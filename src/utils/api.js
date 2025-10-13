@@ -3,7 +3,28 @@
  * Centraliza a lógica de comunicação com o backend
  */
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
+// Configuração da URL base da API com fallbacks
+const getApiBaseUrl = () => {
+  // Primeiro, tenta usar a variável de ambiente
+  if (import.meta.env.VITE_API_BASE_URL) {
+    return import.meta.env.VITE_API_BASE_URL;
+  }
+  
+  // Em produção no Vercel, usar o backend no Render
+  if (window.location.hostname === 'ofix.vercel.app') {
+    return 'https://ofix-backend-prod.onrender.com';
+  }
+  
+  // Em desenvolvimento, usar proxy local
+  if (window.location.hostname === 'localhost') {
+    return ''; // Usar proxy do Vite
+  }
+  
+  // Fallback padrão
+  return 'https://ofix-backend-prod.onrender.com';
+};
+
+const API_BASE_URL = getApiBaseUrl();
 
 /**
  * Faz uma chamada para a API do backend
@@ -16,7 +37,13 @@ export const apiCall = async (endpoint, options = {}) => {
   const cleanEndpoint = endpoint.startsWith('/') ? endpoint.slice(1) : endpoint;
   
   // Monta a URL completa
-  const url = `${API_BASE_URL}/${cleanEndpoint}`;
+  let url;
+  if (API_BASE_URL) {
+    url = `${API_BASE_URL}/api/${cleanEndpoint}`;
+  } else {
+    // Fallback para proxy local em desenvolvimento
+    url = `/api/${cleanEndpoint}`;
+  }
   
   // Configurações padrão
   const defaultOptions = {
@@ -37,30 +64,11 @@ export const apiCall = async (endpoint, options = {}) => {
     }
   };
 
-  console.log('🚀 API Call:', {
-    url,
-    method: requestOptions.method || 'GET',
-    endpoint: cleanEndpoint
-  });
-
   try {
     const response = await fetch(url, requestOptions);
-    
-    console.log('📡 API Response:', {
-      status: response.status,
-      statusText: response.statusText,
-      ok: response.ok,
-      url: response.url
-    });
-
     return response;
   } catch (error) {
-    console.error('❌ API Error:', {
-      url,
-      error: error.message,
-      endpoint: cleanEndpoint
-    });
-    throw error;
+    throw new Error(`API Error: ${error.message} (URL: ${url})`);
   }
 };
 
@@ -102,8 +110,8 @@ export const testMatiasConnection = async (user_id = 'connection_test') => {
   try {
     const data = await chatWithMatias('teste de conexão', user_id);
     return data.success === true;
-  } catch (error) {
-    console.error('Erro ao testar conexão com Matias:', error);
+  } catch {
+    // Erro ao testar conexão com Matias - silencioso para produção
     return false;
   }
 };
