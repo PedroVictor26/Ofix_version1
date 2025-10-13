@@ -9,6 +9,7 @@ import fornecedoresRouter from "./fornecedores.routes.js";
 import financeiroRouter from "./financeiro.routes.js";
 import veiculosRouter from "./veiculos.routes.js"; // Importar o novo router de veículos
 import agnoRouter from "./agno.routes.js"; // Router para integração com Agno AI
+import matiasRouter from "./matias.routes.js"; // Router para funcionalidades do Matias
 // import aiRouter from './ai.routes.js'; // Comentado - funcionalidade de IA removida
 import { protectRoute } from "../middlewares/auth.middleware.js";
 
@@ -81,6 +82,9 @@ router.use("/veiculos", protectRoute, veiculosRouter);
 
 // Rotas do Agno AI Agent (algumas protegidas, outras públicas)
 router.use("/agno", agnoRouter);
+
+// Rotas do Matias (funcionalidades avançadas do assistente)
+router.use("/matias", matiasRouter);
 
 // Rotas do Assistente Virtual (AI) - Removidas temporariamente
 // router.use("/ai", aiRouter);

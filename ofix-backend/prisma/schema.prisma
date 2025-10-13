@@ -245,3 +245,50 @@ enum ServiceStatus {
   FINALIZADO
   CANCELADO
 }
+
+// 🤖 MODELOS PARA SISTEMA MATIAS (ASSISTENTE IA)
+
+model ConversaMatias {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  titulo    String
+  ativa     Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  // Relacionamentos
+  mensagens MensagemMatias[]
+  
+  @@map("conversas_matias")
+}
+
+model MensagemMatias {
+  id         Int      @id @default(autoincrement())
+  conversaId Int
+  tipo       String   // 'user' ou 'matias'
+  conteudo   String
+  metadata   Json?    // Dados extras como timestamp, ações sugeridas, etc
+  createdAt  DateTime @default(now())
+  
+  // Relacionamentos
+  conversa ConversaMatias @relation(fields: [conversaId], references: [id], onDelete: Cascade)
+  
+  @@map("mensagens_matias")
+}
+
+model Agendamento {
+  id           Int      @id @default(autoincrement())
+  servicoId    Int?
+  clienteId    Int
+  veiculoId    Int?
+  dataHora     DateTime
+  tipo         String   // 'urgente', 'normal', 'programado', 'especial'
+  status       String   @default("confirmado") // 'confirmado', 'cancelado', 'reagendado'
+  observacoes  String?
+  criadoPor    String?  // Para identificar se foi criado pelo Matias
+  canceladoPor String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  
+  @@map("agendamentos")
+}

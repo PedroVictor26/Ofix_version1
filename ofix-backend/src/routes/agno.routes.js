@@ -3,11 +3,35 @@ import fetch from 'node-fetch';
 import FormData from 'form-data';
 import jwt from 'jsonwebtoken';
 
+// Importar serviços do Matias
+import ConversasService from '../services/conversas.service.js';
+import AgendamentosService from '../services/agendamentos.service.js';
+import ConsultasOSService from '../services/consultasOS.service.js';
+
 const router = express.Router();
 
 // Configurações do Agno (pode vir de variáveis de ambiente)
 const AGNO_API_URL = process.env.AGNO_API_URL || 'http://localhost:8000';
 const AGNO_API_TOKEN = process.env.AGNO_API_TOKEN || '';
+
+// Registro de context e knowledge para o Agno
+const AGNO_CONTEXT = {
+    name: "OFIX - Sistema de Oficina Automotiva",
+    description: "Assistente virtual Matias para oficina automotiva",
+    capabilities: [
+        "consultar_ordens_servico",
+        "agendar_servicos", 
+        "consultar_pecas",
+        "calcular_orcamentos",
+        "listar_clientes",
+        "historico_veiculos",
+        "estatisticas_oficina"
+    ],
+    endpoints: {
+        base_url: process.env.BACKEND_URL || "http://localhost:3001",
+        auth_required: true
+    }
+};
 
 // Endpoint público para verificar configuração do Agno
 router.get('/config', async (req, res) => {
@@ -119,6 +143,204 @@ router.post('/chat-public', async (req, res) => {
             error: 'Erro interno',
             message: mainError.message,
             agno_url: AGNO_API_URL
+        });
+    }
+});
+
+// ============================================================
+// ENDPOINTS PARA INTEGRAÇÃO COM AGNO - FUNCIONALIDADES MATIAS
+// ============================================================
+
+// Endpoint para o Agno consultar Ordens de Serviço
+router.post('/consultar-os', async (req, res) => {
+    try {
+        const { veiculo, proprietario, status, periodo } = req.body;
+        
+        console.log('🔍 Agno consultando OS:', { veiculo, proprietario, status, periodo });
+        
+        const resultados = await ConsultasOSService.consultarOS({
+            veiculo,
+            proprietario, 
+            status,
+            periodo
+        });
+        
+        res.json({
+            success: true,
+            total: resultados.length,
+            ordens_servico: resultados,
+            timestamp: new Date().toISOString()
+        });
+        
+    } catch (error) {
+        console.error('❌ Erro na consulta OS:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Erro ao consultar ordens de serviço',
+            message: error.message
+        });
+    }
+});
+
+// Endpoint para o Agno agendar serviços
+router.post('/agendar-servico', async (req, res) => {
+    try {
+        const { cliente, veiculo, servico, data_hora, descricao } = req.body;
+        
+        console.log('📅 Agno agendando serviço:', { cliente, veiculo, servico, data_hora });
+        
+        const agendamento = await AgendamentosService.criarAgendamento({
+            clienteId: cliente.id,
+            veiculoId: veiculo.id,
+            tipoServico: servico,
+            dataHora: new Date(data_hora),
+            descricao,
+            status: 'AGENDADO'
+        });
+        
+        res.json({
+            success: true,
+            agendamento,
+            mensagem: `Serviço ${servico} agendado para ${new Date(data_hora).toLocaleString('pt-BR')}`,
+            timestamp: new Date().toISOString()
+        });
+        
+    } catch (error) {
+        console.error('❌ Erro no agendamento:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Erro ao agendar serviço',
+            message: error.message
+        });
+    }
+});
+
+// Endpoint para o Agno consultar estatísticas
+router.get('/estatisticas', async (req, res) => {
+    try {
+        const { periodo = '30_dias' } = req.query;
+        
+        console.log('📊 Agno consultando estatísticas:', { periodo });
+        
+        const stats = await ConsultasOSService.obterEstatisticas(periodo);
+        
+        res.json({
+            success: true,
+            periodo,
+            estatisticas: stats,
+            timestamp: new Date().toISOString()
+        });
+        
+    } catch (error) {
+        console.error('❌ Erro nas estatísticas:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Erro ao consultar estatísticas',
+            message: error.message
+        });
+    }
+});
+
+// Endpoint para o Agno salvar conversas
+router.post('/salvar-conversa', async (req, res) => {
+    try {
+        const { usuario_id, mensagem, resposta, contexto } = req.body;
+        
+        console.log('💾 Agno salvando conversa:', { usuario_id, mensagem: mensagem?.substring(0, 50) });
+        
+        const conversa = await ConversasService.salvarConversa({
+            usuarioId: usuario_id,
+            pergunta: mensagem,
+            resposta,
+            contexto: JSON.stringify(contexto || {}),
+            timestamp: new Date()
+        });
+        
+        res.json({
+            success: true,
+            conversa_id: conversa.id,
+            timestamp: new Date().toISOString()
+        });
+        
+    } catch (error) {
+        console.error('❌ Erro ao salvar conversa:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Erro ao salvar conversa',
+            message: error.message
+        });
+    }
+});
+
+// Endpoint para o Agno recuperar histórico de conversas
+router.get('/historico-conversas/:usuario_id', async (req, res) => {
+    try {
+        const { usuario_id } = req.params;
+        const { limite = 10 } = req.query;
+        
+        console.log('📚 Agno recuperando histórico:', { usuario_id, limite });
+        
+        const historico = await ConversasService.obterHistorico(usuario_id, parseInt(limite));
+        
+        res.json({
+            success: true,
+            usuario_id,
+            total: historico.length,
+            conversas: historico,
+            timestamp: new Date().toISOString()
+        });
+        
+    } catch (error) {
+        console.error('❌ Erro no histórico:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Erro ao recuperar histórico',
+            message: error.message
+        });
+    }
+});
+
+// Endpoint para fornecer contexto do sistema ao Agno
+router.get('/contexto-sistema', async (req, res) => {
+    try {
+        const contexto = {
+            sistema: "OFIX - Sistema de Oficina Automotiva",
+            versao: "2024.1",
+            assistente: "Matias",
+            capacidades: [
+                "Consultar ordens de serviço por veículo, proprietário ou status",
+                "Agendar novos serviços com data e hora específicas", 
+                "Calcular orçamentos baseados em peças e mão de obra",
+                "Consultar histórico completo de veículos",
+                "Gerar relatórios de produtividade da oficina",
+                "Buscar peças no estoque com preços atualizados",
+                "Acompanhar status de serviços em andamento"
+            ],
+            funcoes_disponivel: {
+                "consultar_os": "/agno/consultar-os",
+                "agendar_servico": "/agno/agendar-servico", 
+                "obter_estatisticas": "/agno/estatisticas",
+                "salvar_conversa": "/agno/salvar-conversa",
+                "historico": "/agno/historico-conversas/:usuario_id"
+            },
+            exemplos_uso: {
+                consulta_os: "Mostrar todas as ordens de serviço do Gol 2020 prata",
+                agendamento: "Agendar revisão para o Civic do João na próxima segunda às 14h",
+                estatisticas: "Quantos carros atendemos este mês?"
+            },
+            timestamp: new Date().toISOString()
+        };
+        
+        res.json({
+            success: true,
+            contexto
+        });
+        
+    } catch (error) {
+        console.error('❌ Erro no contexto:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Erro ao obter contexto do sistema'
         });
     }
 });

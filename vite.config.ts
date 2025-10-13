@@ -8,6 +8,7 @@ export default defineConfig({
   server: {
     proxy: {
       "/api": "http://localhost:1000",
+      "/agno": "http://localhost:1000",
     },
   },
   resolve: {

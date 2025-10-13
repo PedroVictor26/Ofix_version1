@@ -79,12 +79,9 @@ const AIPage = () => {
       }
       
       // Testar o endpoint principal do Agno
-      const response = await fetch('/api/agno', {
-        method: 'POST',
-        headers: authHeaders,
-        body: JSON.stringify({
-          message: 'health-check'
-        })
+      const response = await fetch('/agno/contexto-sistema', {
+        method: 'GET',
+        headers: authHeaders
       });
 
       if (response.ok) {
@@ -134,8 +131,8 @@ const AIPage = () => {
         }
       }
       
-      // Usar endpoint principal do Agno (funcionando!)
-      const response = await fetch('/api/agno', {
+      // Usar endpoint do Agno para chat público (teste)
+      const response = await fetch('/agno/chat-public', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
