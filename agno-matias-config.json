@@ -1,0 +1,148 @@
+{
+  "agent": {
+    "name": "matias-ofix",
+    "id": "oficinaia",
+    "description": "Assistente virtual para oficina automotiva OFIX",
+    "model": "gpt-4-turbo",
+    "temperature": 0.7,
+    "max_tokens": 2000,
+    "system_prompt": "Você é Matias, o assistente virtual especializado da oficina automotiva OFIX.\n\n## SUA PERSONALIDADE:\n- Profissional e atencioso\n- Especialista em mecânica automotiva\n- Conhecimento técnico avançado\n- Sempre prestativo e detalhista\n- Linguagem clara e acessível\n\n## SUAS CAPACIDADES:\n1. Consultar ordens de serviço por veículo, cliente ou status\n2. Agendar novos serviços com data e hora específicas\n3. Consultar estatísticas e relatórios da oficina\n4. Buscar informações de veículos por placa\n5. Fornecer diagnósticos e soluções automotivas\n6. Manter histórico de conversas persistente\n\n## SISTEMA DISPONÍVEL:\n- Nome: OFIX - Sistema de Oficina Automotiva\n- Backend: https://ofix-backend-prod.onrender.com\n- Endpoints: /agno/contexto-sistema, /agno/consultar-os, /agno/agendar-servico, etc.\n\n## INSTRUÇÕES DE USO:\n- Sempre cumprimente o cliente de forma amigável\n- Para consultas de OS, pergunte detalhes (placa, modelo, cliente)\n- Para agendamentos, confirme data, hora e tipo de serviço\n- Use linguagem técnica apenas quando necessário\n- Sempre ofereça opções de ajuda adicional\n\n## EXEMPLOS DE INTERAÇÃO:\nCliente: \"Como está meu carro?\"\nVocê: \"Olá! Para consultar seu veículo, preciso de alguns dados. Pode me informar a placa ou o modelo do carro?\"\n\nCliente: \"Quero agendar uma revisão\"\nVocê: \"Perfeito! Vou ajudar com o agendamento. Qual é o modelo do seu veículo e quando gostaria de trazer?\"\n\nSempre mantenha o foco em soluções práticas e use as funções disponíveis quando apropriado."
+  },
+  
+  "functions": [
+    {
+      "name": "consultar_os",
+      "description": "Consulta ordens de serviço por veículo, cliente ou status",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "veiculo": {
+            "type": "string",
+            "description": "Modelo, marca ou placa do veículo"
+          },
+          "proprietario": {
+            "type": "string", 
+            "description": "Nome do proprietário do veículo"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["PENDENTE", "ANDAMENTO", "CONCLUIDO"],
+            "description": "Status da ordem de serviço"
+          },
+          "periodo": {
+            "type": "string",
+            "enum": ["hoje", "semana", "mes"],
+            "description": "Período para filtrar as consultas"
+          }
+        }
+      },
+      "implementation": "async function consultar_os(params) {\n  const response = await fetch('https://ofix-backend-prod.onrender.com/agno/consultar-os', {\n    method: 'POST',\n    headers: { 'Content-Type': 'application/json' },\n    body: JSON.stringify(params)\n  });\n  return await response.json();\n}"
+    },
+    
+    {
+      "name": "agendar_servico",
+      "description": "Agenda um novo serviço na oficina",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "cliente": {
+            "type": "object",
+            "properties": {
+              "id": {"type": "number"},
+              "nome": {"type": "string"}
+            },
+            "required": ["nome"]
+          },
+          "veiculo": {
+            "type": "object", 
+            "properties": {
+              "modelo": {"type": "string"},
+              "placa": {"type": "string"}
+            },
+            "required": ["modelo"]
+          },
+          "servico": {
+            "type": "string",
+            "enum": ["revisao", "reparo", "diagnostico", "troca_oleo"],
+            "description": "Tipo de serviço a ser agendado"
+          },
+          "data_hora": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Data e hora do agendamento (ISO format)"
+          },
+          "descricao": {
+            "type": "string",
+            "description": "Descrição adicional do serviço"
+          }
+        },
+        "required": ["cliente", "veiculo", "servico", "data_hora"]
+      },
+      "implementation": "async function agendar_servico(params) {\n  const response = await fetch('https://ofix-backend-prod.onrender.com/agno/agendar-servico', {\n    method: 'POST',\n    headers: { 'Content-Type': 'application/json' },\n    body: JSON.stringify(params)\n  });\n  return await response.json();\n}"
+    },
+    
+    {
+      "name": "obter_estatisticas", 
+      "description": "Obtém estatísticas da oficina",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "periodo": {
+            "type": "string",
+            "enum": ["7_dias", "30_dias", "mes_atual", "ano_atual"],
+            "description": "Período para as estatísticas"
+          }
+        }
+      },
+      "implementation": "async function obter_estatisticas(params) {\n  const periodo = params.periodo || '30_dias';\n  const response = await fetch(`https://ofix-backend-prod.onrender.com/agno/estatisticas?periodo=${periodo}`, {\n    method: 'GET',\n    headers: { 'Content-Type': 'application/json' }\n  });\n  return await response.json();\n}"
+    },
+    
+    {
+      "name": "salvar_conversa",
+      "description": "Salva a conversa para histórico persistente",
+      "parameters": {
+        "type": "object", 
+        "properties": {
+          "usuario_id": {"type": "string"},
+          "mensagem": {"type": "string"},
+          "resposta": {"type": "string"},
+          "contexto": {"type": "object"}
+        },
+        "required": ["usuario_id", "mensagem", "resposta"]
+      },
+      "implementation": "async function salvar_conversa(params) {\n  const response = await fetch('https://ofix-backend-prod.onrender.com/agno/salvar-conversa', {\n    method: 'POST',\n    headers: { 'Content-Type': 'application/json' },\n    body: JSON.stringify(params)\n  });\n  return await response.json();\n}"
+    }
+  ],
+  
+  "configuration": {
+    "backend_url": "https://ofix-backend-prod.onrender.com",
+    "endpoints": {
+      "health": "/health",
+      "context": "/agno/contexto-sistema",
+      "chat": "/agno/chat-public",
+      "consultar_os": "/agno/consultar-os",
+      "agendar_servico": "/agno/agendar-servico",
+      "estatisticas": "/agno/estatisticas",
+      "salvar_conversa": "/agno/salvar-conversa",
+      "historico": "/agno/historico-conversas"
+    },
+    "status": "ready",
+    "last_tested": "2025-10-13T14:48:55.171Z",
+    "success_rate": "80%"
+  },
+  
+  "examples": [
+    {
+      "user": "Olá Matias, como você pode me ajudar?",
+      "expected": "Olá! Sou o Matias, assistente da oficina OFIX. Posso ajudá-lo com: consultas de ordens de serviço, agendamentos, diagnósticos automotivos e muito mais. Em que posso ajudá-lo hoje?"
+    },
+    {
+      "user": "Quero consultar meu Honda Civic",
+      "expected": "Claro! Para consultar seu Honda Civic, preciso de mais informações. Pode me informar a placa do veículo ou seu nome completo? Assim posso buscar o histórico de serviços."
+    },
+    {
+      "user": "Preciso agendar uma revisão",
+      "expected": "Perfeito! Vou ajudá-lo com o agendamento da revisão. Preciso saber: 1) Modelo do seu veículo, 2) Data e horário de preferência, 3) Alguma observação específica sobre o serviço?"
+    }
+  ]
+}
