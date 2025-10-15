@@ -1,3 +1,4 @@
+import { useState } from "react";
 import {
   Table,
   TableBody,
@@ -8,39 +9,122 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Edit, Package } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Edit, Package, Trash2, AlertTriangle } from "lucide-react";
+import { deletePeca } from "@/services/pecas.service";
+import toast from "react-hot-toast";
 
-const PecaRow = ({ peca, fornecedores, onEdit }) => {
+const PecaRow = ({ peca, fornecedores, onEdit, onDelete }) => {
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  
   const fornecedor = fornecedores.find((f) => f.id === peca.fornecedorId);
   const quantidade = Number(peca.quantidade || peca.estoqueAtual || 0);
   const estoqueMinimo = Number(peca.estoqueMinimo || 0);
   const isEstoqueBaixo = quantidade <= estoqueMinimo;
 
+  const handleDelete = async () => {
+    setIsDeleting(true);
+    const toastId = toast.loading('Excluindo peça...');
+    
+    try {
+      await deletePeca(peca.id);
+      toast.success('Peça excluída com sucesso! 🎉', { id: toastId });
+      setShowDeleteConfirm(false);
+      onDelete?.(); // Callback para recarregar lista
+    } catch (error) {
+      toast.error('Erro ao excluir peça', { id: toastId });
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   return (
-    <TableRow className="bg-white hover:bg-slate-50">
-      <TableCell>
-        <div className="font-medium text-slate-800">{peca.nome}</div>
-        <div className="text-sm text-slate-500">
-          SKU: {peca.sku || peca.codigoFabricante}
-        </div>
-      </TableCell>
-      <TableCell>
-        <Badge variant={isEstoqueBaixo ? "destructive" : "secondary"}>
-          {quantidade} em estoque
-        </Badge>
-      </TableCell>
-      <TableCell className="text-slate-600">
-        {fornecedor?.nome || "Não informado"}
-      </TableCell>
-      <TableCell className="font-medium text-slate-800">
-        R$ {Number(peca.precoVenda || 0).toFixed(2)}
-      </TableCell>
-      <TableCell className="text-right">
-        <Button variant="ghost" size="icon" onClick={() => onEdit(peca)}>
-          <Edit className="w-4 h-4" />
-        </Button>
-      </TableCell>
-    </TableRow>
+    <>
+      <TableRow className="bg-white hover:bg-slate-50">
+        <TableCell>
+          <div className="font-medium text-slate-800">{peca.nome}</div>
+          <div className="text-sm text-slate-500">
+            SKU: {peca.sku || peca.codigoFabricante}
+          </div>
+        </TableCell>
+        <TableCell>
+          <Badge variant={isEstoqueBaixo ? "destructive" : "secondary"}>
+            {quantidade} em estoque
+          </Badge>
+        </TableCell>
+        <TableCell className="text-slate-600">
+          {fornecedor?.nome || "Não informado"}
+        </TableCell>
+        <TableCell className="font-medium text-slate-800">
+          R$ {Number(peca.precoVenda || 0).toFixed(2)}
+        </TableCell>
+        <TableCell className="text-right">
+          <div className="flex items-center justify-end gap-2">
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              onClick={() => onEdit(peca)}
+              title="Editar peça"
+            >
+              <Edit className="w-4 h-4" />
+            </Button>
+            
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              onClick={() => setShowDeleteConfirm(true)}
+              className="hover:bg-red-50 hover:text-red-600"
+              title="Excluir peça"
+            >
+              <Trash2 className="w-4 h-4" />
+            </Button>
+          </div>
+        </TableCell>
+      </TableRow>
+
+      {/* Modal de Confirmação */}
+      <Dialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-red-600">
+              <AlertTriangle className="w-5 h-5" />
+              Excluir Peça
+            </DialogTitle>
+            <DialogDescription>
+              Tem certeza que deseja excluir <strong>{peca.nome}</strong>?
+              <br />
+              <span className="text-red-600 font-medium">
+                Esta ação não pode ser desfeita.
+              </span>
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button 
+              variant="outline" 
+              onClick={() => setShowDeleteConfirm(false)}
+              disabled={isDeleting}
+            >
+              Cancelar
+            </Button>
+            <Button 
+              variant="destructive" 
+              onClick={handleDelete}
+              disabled={isDeleting}
+            >
+              {isDeleting ? 'Excluindo...' : 'Excluir'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 };
 
@@ -56,7 +140,7 @@ const EmptyState = () => (
   </TableRow>
 );
 
-export default function PecasListTable({ pecas, fornecedores, onEditPeca }) {
+export default function PecasListTable({ pecas, fornecedores, onEditPeca, onDeletePeca }) {
   return (
     <div className="border border-slate-200 rounded-xl">
       <Table>
@@ -77,6 +161,7 @@ export default function PecasListTable({ pecas, fornecedores, onEditPeca }) {
                 peca={peca}
                 fornecedores={fornecedores}
                 onEdit={onEditPeca}
+                onDelete={onDeletePeca}
               />
             ))
           ) : (

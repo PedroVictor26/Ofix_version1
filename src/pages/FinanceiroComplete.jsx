@@ -469,6 +469,13 @@ export default function FinanceiroComplete() {
     const [searchTerm, setSearchTerm] = useState("");
     const [isModalOpen, setModalOpen] = useState(false);
     const [editingTransacao, setEditingTransacao] = useState(null);
+    const [currentPage, setCurrentPage] = useState(1);
+    const itemsPerPage = 10;
+
+    // Resetar página quando o filtro de período mudar
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [filterPeriod]);
 
     const filteredTransacoes = useMemo(() =>
         transacoes.filter(transacao => {
@@ -478,6 +485,20 @@ export default function FinanceiroComplete() {
                 transacao.categoria?.toLowerCase().includes(termo)
             );
         }), [transacoes, searchTerm]);
+    
+    // Calcular transações para exibir com paginação
+    const displayedTransacoes = useMemo(() => {
+        if (filterPeriod === 'all') {
+            const startIndex = (currentPage - 1) * itemsPerPage;
+            return filteredTransacoes.slice(startIndex, startIndex + itemsPerPage);
+        }
+        return filteredTransacoes.slice(0, 10);
+    }, [filteredTransacoes, filterPeriod, currentPage, itemsPerPage]);
+    
+    const totalPages = useMemo(() => 
+        Math.ceil(filteredTransacoes.length / itemsPerPage), 
+        [filteredTransacoes.length, itemsPerPage]
+    );
 
     const handleNewTransacao = useCallback(() => {
         setEditingTransacao(null);
@@ -589,9 +610,47 @@ export default function FinanceiroComplete() {
                                     </CardHeader>
                                     <CardContent className="relative">
                                         <FinanceiroTable 
-                                            transacoes={filteredTransacoes.slice(0, 10)} 
+                                            transacoes={displayedTransacoes} 
                                             onEditTransacao={handleEditTransacao} 
                                         />
+                                        
+                                        {/* Informação de Paginação */}
+                                        <div className="mt-4 flex items-center justify-between text-sm text-slate-600 border-t pt-4">
+                                            <div className="flex items-center gap-2">
+                                                <Clock className="w-4 h-4" />
+                                                <span>
+                                                    Mostrando {displayedTransacoes.length} de {filteredTransacoes.length} transações
+                                                </span>
+                                            </div>
+                                            
+                                            {filterPeriod === 'all' && totalPages > 1 && (
+                                                <div className="flex items-center gap-2">
+                                                    <Button
+                                                        variant="outline"
+                                                        size="sm"
+                                                        onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                                                        disabled={currentPage === 1}
+                                                        className="h-8 px-3"
+                                                    >
+                                                        Anterior
+                                                    </Button>
+                                                    
+                                                    <span className="px-3 py-1 bg-slate-100 rounded-md font-medium">
+                                                        Página {currentPage} de {totalPages}
+                                                    </span>
+                                                    
+                                                    <Button
+                                                        variant="outline"
+                                                        size="sm"
+                                                        onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                                                        disabled={currentPage === totalPages}
+                                                        className="h-8 px-3"
+                                                    >
+                                                        Próxima
+                                                    </Button>
+                                                </div>
+                                            )}
+                                        </div>
                                     </CardContent>
                                 </Card>
                             </div>

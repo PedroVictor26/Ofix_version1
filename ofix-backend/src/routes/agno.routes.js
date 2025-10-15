@@ -3,51 +3,16 @@ import fetch from 'node-fetch';
 import FormData from 'form-data';
 import jwt from 'jsonwebtoken';
 
-// Serviços opcionais (para não quebrar se não existirem)
-let ConversasService = null;
-let AgendamentosService = null;
-let ConsultasOSService = null;
-
-// Tentar importar serviços, mas não falhar se não existirem
-Promise.resolve().then(async () => {
-    try {
-        const mod = await import('../services/conversas.service.js');
-        ConversasService = mod.default;
-        console.log('✅ ConversasService carregado');
-    } catch (error) {
-        console.warn('⚠️ ConversasService não disponível');
-    }
-}).catch(() => {});
-
-Promise.resolve().then(async () => {
-    try {
-        const mod = await import('../services/agendamentos.service.js');
-        AgendamentosService = mod.default;
-        console.log('✅ AgendamentosService carregado');
-    } catch (error) {
-        console.warn('⚠️ AgendamentosService não disponível');
-    }
-}).catch(() => {});
-
-Promise.resolve().then(async () => {
-    try {
-        const mod = await import('../services/consultasOS.service.js');
-        ConsultasOSService = mod.default;
-        console.log('✅ ConsultasOSService carregado');
-    } catch (error) {
-        console.warn('⚠️ ConsultasOSService não disponível');
-    }
-}).catch(() => {});
+// Importar serviços do Matias
+import ConversasService from '../services/conversas.service.js';
+import AgendamentosService from '../services/agendamentos.service.js';
+import ConsultasOSService from '../services/consultasOS.service.js';
 
 const router = express.Router();
 
 // Configurações do Agno (pode vir de variáveis de ambiente)
 const AGNO_API_URL = process.env.AGNO_API_URL || 'http://localhost:8000';
 const AGNO_API_TOKEN = process.env.AGNO_API_TOKEN || '';
-
-// Configuração específica para Matias Agent
-const MATIAS_AGENT_URL = process.env.MATIAS_AGENT_URL || 'https://matias-agno-assistant.onrender.com';
-const MATIAS_TIMEOUT = parseInt(process.env.MATIAS_TIMEOUT || '30000');
 
 // Registro de context e knowledge para o Agno
 const AGNO_CONTEXT = {
@@ -86,116 +51,6 @@ router.get('/config', async (req, res) => {
         res.status(500).json({
             error: 'Erro ao verificar configuração',
             message: error.message
-        });
-    }
-});
-
-// Endpoint de integração direta com o Agente Matias
-router.post('/chat-matias', async (req, res) => {
-    try {
-        const { message, user_id } = req.body;
-        
-        if (!message) {
-            return res.status(400).json({ 
-                success: false,
-                error: 'Mensagem é obrigatória' 
-            });
-        }
-
-        console.log('🤖 Integrando com Matias Agent:', {
-            url: MATIAS_AGENT_URL,
-            message: message.substring(0, 50) + '...',
-            user_id: user_id || 'anonymous'
-        });
-
-        // Chamar o agente Matias diretamente
-        const response = await fetch(`${MATIAS_AGENT_URL}/chat`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'User-Agent': 'OFIX-Backend/1.0',
-                'X-Request-Source': 'ofix-integration'
-            },
-            body: JSON.stringify({ message }),
-            timeout: MATIAS_TIMEOUT
-        });
-
-        if (response.ok) {
-            const agentData = await response.json();
-            
-            console.log('✅ Resposta do Matias Agent:', {
-                status: agentData.status,
-                model: agentData.model,
-                response_length: agentData.response?.length || 0
-            });
-
-            // Salvar conversa no banco OFIX (opcional)
-            if (user_id) {
-                try {
-                    // Tentar salvar conversa, mas não falhar se não conseguir
-                    if (typeof ConversasService?.salvarConversa === 'function') {
-                        await ConversasService.salvarConversa({
-                            usuarioId: user_id,
-                            pergunta: message,
-                            resposta: agentData.response,
-                            contexto: JSON.stringify({
-                                agent: 'matias',
-                                model: agentData.model,
-                                status: agentData.status
-                            }),
-                            timestamp: new Date()
-                        });
-                        console.log('💾 Conversa salva no banco OFIX');
-                    } else {
-                        console.log('📝 ConversasService indisponível, pular log');
-                    }
-                } catch (saveError) {
-                    console.warn('⚠️ Erro ao salvar conversa:', saveError.message);
-                    // Não falhar a requisição por causa do log
-                }
-            }
-
-            res.json({
-                success: true,
-                response: agentData.response,
-                agent: 'matias',
-                model: agentData.model || 'agno-groq-lancedb',
-                status: agentData.status,
-                timestamp: new Date().toISOString()
-            });
-
-        } else {
-            const errorText = await response.text();
-            console.error('❌ Erro do Matias Agent:', response.status, errorText);
-            
-            // Resposta de fallback quando Matias não está disponível
-            const fallbackResponse = `🔧 **OFIX Assistant**\n\nDesculpe, o assistente Matias está temporariamente indisponível.\n\nVocê perguntou: "${message}"\n\n**Como posso ajudar:**\n• Para emergências: ligue (11) 99999-9999\n• Para agendamentos: acesse nossa agenda online\n• Para orçamentos: envie fotos do problema\n\n*🔄 Tentando reconectar com o assistente...*`;
-            
-            res.json({
-                success: true,
-                response: fallbackResponse,
-                agent: 'ofix-fallback',
-                model: 'fallback',
-                status: 'fallback',
-                matias_error: response.status,
-                timestamp: new Date().toISOString()
-            });
-        }
-
-    } catch (error) {
-        console.error('❌ Erro na integração com Matias:', error.message);
-        
-        // Fallback para erro de conexão
-        const fallbackResponse = `🤖 **OFIX Assistant**\n\nVocê disse: "${req.body.message}"\n\n**Serviços disponíveis:**\n• Troca de óleo: R$ 80-120\n• Revisão completa: R$ 200-400\n• Diagnóstico: R$ 50-100\n• Alinhamento: R$ 60-80\n\n*💡 Para informações precisas, consulte nossa equipe.*\n\n📞 **Contato**: (11) 99999-9999`;
-        
-        res.json({
-            success: true,
-            response: fallbackResponse,
-            agent: 'ofix-local',
-            model: 'local-fallback',
-            status: 'local-fallback',
-            error: error.message,
-            timestamp: new Date().toISOString()
         });
     }
 });

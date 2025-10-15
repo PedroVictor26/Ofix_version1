@@ -211,7 +211,8 @@ export default function EstoqueComplete() {
                             <PecasListTable 
                                 pecas={filteredPecas} 
                                 fornecedores={fornecedores} 
-                                onEditPeca={handleEditPeca} 
+                                onEditPeca={handleEditPeca}
+                                onDeletePeca={loadPecas}
                             />
                         </div>
                     </main>

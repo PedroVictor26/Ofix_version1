@@ -170,25 +170,24 @@ export default function ClienteModal({ isOpen, onClose, cliente, onSuccess }) {
     setIsSaving(true);
 
     try {
-
-      // Preparar dados para envio (remover campo 'nome' e usar apenas 'nomeCompleto')
-      const { nome, ...otherData } = formData;
+      // CORREÇÃO: Mapear 'nome' para 'nomeCompleto' e 'cpf' para 'cpfCnpj'
+      const { nome, cpf, ...otherData } = formData;
       const dataToSend = {
         ...otherData,
         nomeCompleto: nome,
+        cpfCnpj: cpf || undefined, // Mapear cpf para cpfCnpj (backend espera esse campo)
+        telefone: formData.telefone.replace(/\D/g, '') // Limpar formatação do telefone
       };
 
       if (cliente) {
         // Se o objeto 'cliente' existe, estamos editando
         await updateCliente(cliente.id, dataToSend);
-        toast.success("Cliente atualizado com sucesso!");
+        toast.success("Cliente atualizado com sucesso! 🎉");
       } else {
         // Se não, estamos criando um novo
         await createCliente(dataToSend);
-        toast.success("Cliente criado com sucesso!");
+        toast.success("Cliente criado com sucesso! 🎉");
       }
-
-      // --- FIM DA LÓGICA REAL ---
 
       onSuccess(); // Chama a função para avisar o componente pai que algo mudou
       onClose(); // Fecha o modal
