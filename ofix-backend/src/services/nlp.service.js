@@ -151,26 +151,43 @@ export class NLPService {
         // Padrões melhorados: "do João", "da Maria", "para o João", "cliente João", "Nome: João"
         // IMPORTANTE: Ignorar se for um modelo de veículo
         
+        console.log('   🔍 Iniciando extração de nome...');
+        console.log('   📝 Mensagem original:', mensagem);
+        
         // Tentar padrão explícito primeiro: "Nome: João" ou "Cliente: João"
         const padraoExplicito = /(?:nome|cliente):\s*([A-ZÀ-Üa-zà-ü]+(?:\s+[A-ZÀ-Üa-zà-ü]+)*)/i;
         const matchExplicito = mensagem.match(padraoExplicito);
         
+        console.log('   🔎 Match explícito (Nome:/Cliente:):', matchExplicito);
+        
         if (matchExplicito) {
             const nomeExtraido = matchExplicito[1].trim();
+            console.log('   ✅ Nome extraído (explícito):', nomeExtraido);
             if (!modelosComuns.some(m => m.toLowerCase() === nomeExtraido.toLowerCase())) {
                 entidades.cliente = nomeExtraido;
+                console.log('   ✅ Cliente definido:', entidades.cliente);
+            } else {
+                console.log('   ⚠️ Nome descartado (é modelo de veículo)');
             }
         } else {
             // Tentar padrões contextuais: "do João", "da Maria", etc
             const padraoNome = /(?:do|da|para o|para a|de|cliente)\s+([A-ZÀ-Üa-zà-ü]+(?:\s+[A-ZÀ-Üa-zà-ü]+)*?)(?:\s+na|\s+no|\s+às|\s+as|\s+em|\s+,|\s*$)/i;
             const matchNome = mensagem.match(padraoNome);
             
+            console.log('   🔎 Match contextual (do/da/para):', matchNome);
+            
             if (matchNome) {
                 const nomeExtraido = matchNome[1].trim();
+                console.log('   ✅ Nome extraído (contextual):', nomeExtraido);
                 // Verificar se não é um modelo de veículo
                 if (!modelosComuns.some(m => m.toLowerCase() === nomeExtraido.toLowerCase())) {
                     entidades.cliente = nomeExtraido;
+                    console.log('   ✅ Cliente definido:', entidades.cliente);
+                } else {
+                    console.log('   ⚠️ Nome descartado (é modelo de veículo):', nomeExtraido);
                 }
+            } else {
+                console.log('   ❌ Nenhum nome detectado');
             }
         }
         

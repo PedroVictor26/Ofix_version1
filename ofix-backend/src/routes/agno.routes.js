@@ -242,6 +242,17 @@ router.post('/chat-inteligente', async (req, res) => {
 
 async function processarAgendamento(mensagem, usuario_id) {
     try {
+        // 0. BUSCAR OFICINA DO USUÁRIO
+        let oficinaId = null;
+        if (usuario_id) {
+            const usuario = await prisma.user.findUnique({
+                where: { id: parseInt(usuario_id) },
+                select: { oficina_id: true }
+            });
+            oficinaId = usuario?.oficina_id;
+            console.log('   🏢 Oficina ID:', oficinaId);
+        }
+        
         // 1. EXTRAIR ENTIDADES
         const entidades = NLPService.extrairEntidadesAgendamento(mensagem);
         console.log('   📋 Entidades:', JSON.stringify(entidades, null, 2));
@@ -304,33 +315,47 @@ async function processarAgendamento(mensagem, usuario_id) {
         let clientesSugeridos = [];
         
         if (entidades.cliente) {
-            // Busca exata primeiro
+            // Busca exata primeiro (FILTRADO POR OFICINA)
+            const whereClause = {
+                nomeCompleto: {
+                    contains: entidades.cliente,
+                    mode: 'insensitive'
+                }
+            };
+            
+            // Adicionar filtro de oficina se disponível
+            if (oficinaId) {
+                whereClause.oficina_id = oficinaId;
+            }
+            
             cliente = await prisma.cliente.findFirst({
-                where: {
-                    nomeCompleto: {
-                        contains: entidades.cliente,
-                        mode: 'insensitive'
-                    }
-                },
+                where: whereClause,
                 include: {
                     veiculos: true
                 }
             });
             
-            // Se não encontrou, buscar clientes similares para sugestão
+            // Se não encontrou, buscar clientes similares para sugestão (FILTRADO POR OFICINA)
             if (!cliente) {
                 const palavrasBusca = entidades.cliente.split(' ').filter(p => p.length > 2);
                 
                 if (palavrasBusca.length > 0) {
+                    const whereSugestoes = {
+                        OR: palavrasBusca.map(palavra => ({
+                            nomeCompleto: {
+                                contains: palavra,
+                                mode: 'insensitive'
+                            }
+                        }))
+                    };
+                    
+                    // Adicionar filtro de oficina
+                    if (oficinaId) {
+                        whereSugestoes.oficina_id = oficinaId;
+                    }
+                    
                     clientesSugeridos = await prisma.cliente.findMany({
-                        where: {
-                            OR: palavrasBusca.map(palavra => ({
-                                nomeCompleto: {
-                                    contains: palavra,
-                                    mode: 'insensitive'
-                                }
-                            }))
-                        },
+                        where: whereSugestoes,
                         include: {
                             veiculos: true
                         },
