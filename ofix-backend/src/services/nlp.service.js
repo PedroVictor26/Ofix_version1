@@ -45,16 +45,16 @@ export class NLPService {
             return 'ESTATISTICAS';
         }
         
-        // INTENÇÃO: CONSULTA CLIENTE
-        const padraoCliente = /\b(cliente|clientes|cadastro|telefone|cpf|cnpj|endereço|endereco|contato|dados do cliente)\b/i;
-        if (padraoCliente.test(msg)) {
-            return 'CONSULTA_CLIENTE';
-        }
-        
-        // INTENÇÃO: CADASTRAR CLIENTE
+        // INTENÇÃO: CADASTRAR CLIENTE (verificar ANTES de consulta para não confundir)
         const padraoCadastro = /\b(cadastr|novo cliente|adicionar cliente|criar cliente|incluir cliente|registrar cliente)\b/i;
         if (padraoCadastro.test(msg)) {
             return 'CADASTRAR_CLIENTE';
+        }
+        
+        // INTENÇÃO: CONSULTA CLIENTE
+        const padraoCliente = /\b(cliente|clientes|telefone|cpf|cnpj|endereço|endereco|contato|dados do cliente)\b/i;
+        if (padraoCliente.test(msg)) {
+            return 'CONSULTA_CLIENTE';
         }
         
         // DEFAULT: Conversa geral
