@@ -246,10 +246,10 @@ async function processarAgendamento(mensagem, usuario_id) {
         let oficinaId = null;
         if (usuario_id) {
             const usuario = await prisma.user.findUnique({
-                where: { id: parseInt(usuario_id) },
-                select: { oficina_id: true }
+                where: { id: String(usuario_id) }, // USER ID É STRING (UUID)
+                select: { oficinaId: true }
             });
-            oficinaId = usuario?.oficina_id;
+            oficinaId = usuario?.oficinaId;
             console.log('   🏢 Oficina ID:', oficinaId);
         }
         
@@ -325,7 +325,7 @@ async function processarAgendamento(mensagem, usuario_id) {
             
             // Adicionar filtro de oficina se disponível
             if (oficinaId) {
-                whereClause.oficina_id = oficinaId;
+                whereClause.oficinaId = oficinaId; // CAMPO É oficinaId (camelCase)
             }
             
             cliente = await prisma.cliente.findFirst({
@@ -351,7 +351,7 @@ async function processarAgendamento(mensagem, usuario_id) {
                     
                     // Adicionar filtro de oficina
                     if (oficinaId) {
-                        whereSugestoes.oficina_id = oficinaId;
+                        whereSugestoes.oficinaId = oficinaId; // CAMPO É oficinaId (camelCase)
                     }
                     
                     clientesSugeridos = await prisma.cliente.findMany({
