@@ -194,6 +194,10 @@ router.post('/chat-inteligente', async (req, res) => {
                 response = await processarConsultaCliente(message);
                 break;
                 
+            case 'CADASTRAR_CLIENTE':
+                response = await processarCadastroCliente(message, usuario_id);
+                break;
+                
             case 'AJUDA':
                 response = {
                     success: true,
@@ -711,6 +715,119 @@ async function processarConversaGeral(mensagem) {
         response: '🤖 **Assistente Matias**\n\nComo posso ajudar?\n\n💡 Digite "ajuda" para ver o que posso fazer.',
         tipo: 'conversa'
     };
+}
+
+// ============================================================================
+// 👤 FUNÇÃO: PROCESSAR CADASTRO DE CLIENTE
+// ============================================================================
+
+async function processarCadastroCliente(mensagem, usuario_id) {
+    try {
+        // Buscar oficinaId do usuário
+        let oficinaId = null;
+        if (usuario_id) {
+            const usuario = await prisma.user.findUnique({
+                where: { id: String(usuario_id) },
+                select: { oficinaId: true }
+            });
+            oficinaId = usuario?.oficinaId;
+        }
+        
+        if (!oficinaId) {
+            return {
+                success: false,
+                response: '❌ **Erro:** Não foi possível identificar sua oficina.',
+                tipo: 'erro'
+            };
+        }
+        
+        // Extrair dados do cliente da mensagem
+        const dados = NLPService.extrairDadosCliente(mensagem);
+        
+        console.log('   📋 Dados extraídos:', dados);
+        
+        // Verificar se tem dados suficientes
+        if (!dados.nome || dados.nome.length < 3) {
+            return {
+                success: false,
+                response: `📝 **Para cadastrar um novo cliente, preciso dos seguintes dados:**
+
+• **Nome completo**
+• Telefone (opcional)
+• CPF/CNPJ (opcional)
+• Email (opcional)
+
+**Exemplo:**
+"Nome: João Silva, Tel: (85) 99999-9999, CPF: 123.456.789-00"
+
+**Ou informe apenas o nome para cadastro rápido:**
+"Cadastrar cliente João Silva"`,
+                tipo: 'pergunta'
+            };
+        }
+        
+        // Verificar se cliente já existe
+        const clienteExistente = await prisma.cliente.findFirst({
+            where: {
+                nomeCompleto: {
+                    equals: dados.nome,
+                    mode: 'insensitive'
+                },
+                oficinaId
+            }
+        });
+        
+        if (clienteExistente) {
+            return {
+                success: false,
+                response: `⚠️ **Cliente já cadastrado!**
+
+**Nome:** ${clienteExistente.nomeCompleto}
+**Telefone:** ${clienteExistente.telefone || 'Não informado'}
+**CPF/CNPJ:** ${clienteExistente.cpfCnpj || 'Não informado'}
+
+💡 Deseja fazer um agendamento para este cliente?`,
+                tipo: 'alerta',
+                cliente: clienteExistente
+            };
+        }
+        
+        // Criar novo cliente
+        const novoCliente = await prisma.cliente.create({
+            data: {
+                nomeCompleto: dados.nome,
+                telefone: dados.telefone || null,
+                cpfCnpj: dados.cpfCnpj || null,
+                email: dados.email || null,
+                oficinaId
+            }
+        });
+        
+        return {
+            success: true,
+            response: `✅ **Cliente cadastrado com sucesso!**
+
+**Nome:** ${novoCliente.nomeCompleto}
+${dados.telefone ? `**Telefone:** ${dados.telefone}` : ''}
+${dados.cpfCnpj ? `**CPF/CNPJ:** ${dados.cpfCnpj}` : ''}
+${dados.email ? `**Email:** ${dados.email}` : ''}
+
+💡 **Próximos passos:**
+• Fazer agendamento para este cliente
+• Cadastrar veículo do cliente
+• Adicionar mais informações`,
+            tipo: 'sucesso',
+            cliente: novoCliente
+        };
+        
+    } catch (error) {
+        console.error('❌ Erro ao cadastrar cliente:', error);
+        return {
+            success: false,
+            response: '❌ **Erro ao cadastrar cliente**\n\nPor favor, tente novamente ou cadastre manualmente na tela de clientes.',
+            tipo: 'erro'
+        };
+    }
 }
 
 // ============================================================

@@ -51,6 +51,12 @@ export class NLPService {
             return 'CONSULTA_CLIENTE';
         }
         
+        // INTENÇÃO: CADASTRAR CLIENTE
+        const padraoCadastro = /\b(cadastr|novo cliente|adicionar cliente|criar cliente|incluir cliente|registrar cliente)\b/i;
+        if (padraoCadastro.test(msg)) {
+            return 'CADASTRAR_CLIENTE';
+        }
+        
         // DEFAULT: Conversa geral
         return 'CONVERSA_GERAL';
     }
@@ -358,6 +364,45 @@ export class NLPService {
             dados.status = 'EM_ANDAMENTO';
         } else if (msg.includes('aguardando') || msg.includes('pendente')) {
             dados.status = 'AGUARDANDO';
+        }
+        
+        return dados;
+    }
+    
+    /**
+     * Extrai dados para cadastro de cliente
+     * @param {string} mensagem - Mensagem do usuário
+     * @returns {Object} - Objeto com dados do cliente
+     */
+    static extrairDadosCliente(mensagem) {
+        const dados = {};
+        
+        // Extrair nome
+        const padraoNome = /(?:nome|cliente):\s*([A-ZÀ-Üa-zà-ü\s]+?)(?:\s*,|\s*tel|\s*cpf|\s*$)/i;
+        const matchNome = mensagem.match(padraoNome);
+        if (matchNome) {
+            dados.nome = matchNome[1].trim();
+        }
+        
+        // Extrair telefone (vários formatos)
+        const padraoTelefone = /(?:tel|telefone|celular|fone):\s*([0-9\s\(\)-]{10,15})/i;
+        const matchTelefone = mensagem.match(padraoTelefone);
+        if (matchTelefone) {
+            dados.telefone = matchTelefone[1].trim().replace(/\D/g, '');
+        }
+        
+        // Extrair CPF/CNPJ
+        const padraoCPF = /(?:cpf|cnpj):\s*([0-9.-]{11,18})/i;
+        const matchCPF = mensagem.match(padraoCPF);
+        if (matchCPF) {
+            dados.cpfCnpj = matchCPF[1].trim().replace(/\D/g, '');
+        }
+        
+        // Extrair email
+        const padraoEmail = /(?:email|e-mail):\s*([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/i;
+        const matchEmail = mensagem.match(padraoEmail);
+        if (matchEmail) {
+            dados.email = matchEmail[1].trim();
         }
         
         return dados;
