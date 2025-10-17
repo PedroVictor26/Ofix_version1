@@ -829,7 +829,8 @@ async function processarCadastroCliente(mensagem, usuario_id) {
 
 **Ou informe apenas o nome para cadastro rápido:**
 "Cadastrar cliente João Silva"`,
-                tipo: 'pergunta'
+                tipo: 'cadastro',
+                dadosExtraidos: dados // 🎯 Retorna dados parciais extraídos
             };
         }
         
@@ -855,7 +856,13 @@ async function processarCadastroCliente(mensagem, usuario_id) {
 
 💡 Deseja fazer um agendamento para este cliente?`,
                 tipo: 'alerta',
-                cliente: clienteExistente
+                cliente: clienteExistente,
+                dadosExtraidos: {
+                    nome: clienteExistente.nomeCompleto,
+                    telefone: clienteExistente.telefone,
+                    cpfCnpj: clienteExistente.cpfCnpj,
+                    email: clienteExistente.email
+                }
             };
         }
         

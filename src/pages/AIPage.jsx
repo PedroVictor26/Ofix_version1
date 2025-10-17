@@ -21,6 +21,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useAuth } from '../context/AuthContext.jsx';
+import ClienteModal from '../components/clientes/ClienteModal';
 
 /**
  * Página dedicada para interação com o Assistente de IA (Agno Agent)
@@ -46,6 +47,10 @@ const AIPage = () => {
     pitch: 1.0, // Tom (0 a 2)
     volume: 1.0 // Volume (0 a 1)
   });
+  
+  // Estados para modal de cadastro de cliente
+  const [modalClienteAberto, setModalClienteAberto] = useState(false);
+  const [clientePrePreenchido, setClientePrePreenchido] = useState(null);
   
   const chatContainerRef = useRef(null);
   const inputRef = useRef(null);
@@ -522,6 +527,21 @@ const AIPage = () => {
           return novasConversas;
         });
         
+        // 🎯 DETECTAR INTENÇÃO DE CADASTRO E ABRIR MODAL
+        // Abre modal quando: pede mais dados (cadastro) OU cliente já existe (alerta)
+        if ((data.tipo === 'cadastro' || data.tipo === 'alerta') && data.dadosExtraidos) {
+          // Pré-preencher modal com dados extraídos pelo NLP
+          setClientePrePreenchido({
+            nomeCompleto: data.dadosExtraidos.nome || '',
+            telefone: data.dadosExtraidos.telefone || '',
+            cpfCnpj: data.dadosExtraidos.cpfCnpj || '',
+            email: data.dadosExtraidos.email || ''
+          });
+          
+          // Abrir modal para revisão/complementação dos dados
+          setModalClienteAberto(true);
+        }
+        
         // Falar resposta automaticamente se voz estiver habilitada
         if (vozHabilitada && responseContent) {
           const textoLimpo = responseContent
@@ -988,6 +1008,37 @@ const AIPage = () => {
           )}
         </div>
       </div>
+
+      {/* 📝 MODAL DE CADASTRO DE CLIENTE */}
+      <ClienteModal
+        isOpen={modalClienteAberto}
+        onClose={() => setModalClienteAberto(false)}
+        cliente={clientePrePreenchido}
+        onSuccess={(clienteData) => {
+          // Fechar modal
+          setModalClienteAberto(false);
+          setClientePrePreenchido(null);
+          
+          // Adicionar mensagem de sucesso ao chat
+          const mensagemSucesso = {
+            id: Date.now(),
+            tipo: 'sucesso',
+            conteudo: `✅ Cliente **${clienteData.nomeCompleto}** cadastrado com sucesso! Posso ajudar em mais alguma coisa?`,
+            timestamp: new Date().toISOString()
+          };
+          
+          setConversas(prev => {
+            const novasConversas = [...prev, mensagemSucesso];
+            salvarConversasLocal(novasConversas);
+            return novasConversas;
+          });
+          
+          // Falar confirmação se voz habilitada
+          if (vozHabilitada) {
+            falarTexto(`Cliente ${clienteData.nomeCompleto} cadastrado com sucesso!`);
+          }
+        }}
+      />
     </div>
   );
 };
