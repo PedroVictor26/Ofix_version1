@@ -240,6 +240,73 @@ router.post('/chat-inteligente', async (req, res) => {
     }
 });
 
+// ============================================================
+// 📜 HISTÓRICO DE CONVERSAS
+// ============================================================
+
+router.get('/historico-conversa', async (req, res) => {
+    try {
+        const { usuario_id } = req.query;
+        
+        if (!usuario_id) {
+            return res.status(400).json({
+                success: false,
+                error: 'usuario_id é obrigatório'
+            });
+        }
+
+        console.log('📜 Buscando histórico para usuário:', usuario_id);
+
+        // Converter UUID para Int para busca
+        const usuarioIdInt = parseInt(usuario_id.replace(/-/g, '').substring(0, 9), 16) % 2147483647;
+
+        // Buscar conversa mais recente do usuário
+        const conversa = await prisma.conversaMatias.findFirst({
+            where: { usuarioId: usuarioIdInt },
+            orderBy: { criadoEm: 'desc' },
+            include: {
+                mensagens: {
+                    orderBy: { criadoEm: 'asc' },
+                    take: 50 // Últimas 50 mensagens
+                }
+            }
+        });
+
+        if (!conversa || conversa.mensagens.length === 0) {
+            return res.json({
+                success: true,
+                mensagens: [],
+                total: 0
+            });
+        }
+
+        // Formatar mensagens
+        const mensagensFormatadas = conversa.mensagens.map(msg => ({
+            id: msg.id,
+            tipo_remetente: msg.tipoRemetente,
+            conteudo: msg.conteudo,
+            timestamp: msg.criadoEm
+        }));
+
+        console.log(`✅ Histórico retornado: ${mensagensFormatadas.length} mensagens`);
+
+        res.json({
+            success: true,
+            mensagens: mensagensFormatadas,
+            total: mensagensFormatadas.length,
+            conversa_id: conversa.id
+        });
+
+    } catch (error) {
+        console.error('❌ Erro ao buscar histórico:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Erro ao buscar histórico',
+            message: error.message
+        });
+    }
+});
+
 // ============================================================================
 // 📅 FUNÇÃO: PROCESSAR AGENDAMENTO
 // ============================================================================

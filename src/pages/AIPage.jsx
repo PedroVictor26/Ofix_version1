@@ -7,11 +7,15 @@ import {
   Loader2, 
   Settings, 
   MessageCircle,
-  MessageSquare,
   Zap,
   AlertCircle,
   CheckCircle,
-  Wrench
+  Wrench,
+  Trash2,
+  Mic,
+  MicOff,
+  Volume2,
+  VolumeX
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -27,19 +31,66 @@ const AIPage = () => {
   const [conversas, setConversas] = useState([]);
   const [carregando, setCarregando] = useState(false);
   const [statusConexao, setStatusConexao] = useState('desconectado'); // conectado, conectando, desconectado, erro
-  const [sessionId, setSessionId] = useState(null); // Para manter contexto da sessão
-  const [_configuracoes, _setConfiguracoes] = useState({
-    agentId: import.meta.env.VITE_AGNO_AGENT_ID || 'agente-ofix',
-    apiUrl: import.meta.env.VITE_AGNO_API_URL || 'http://localhost:8000',
-    modelo: 'auto'
-  });
+  
+  // Estados para funcionalidades de voz
+  const [gravando, setGravando] = useState(false);
+  const [vozHabilitada, setVozHabilitada] = useState(true);
+  const [falando, setFalando] = useState(false);
   
   const chatContainerRef = useRef(null);
   const inputRef = useRef(null);
+  const recognitionRef = useRef(null);
+  const synthesisRef = useRef(null);
 
-  // Mensagem inicial do sistema
+  // Carregar histórico de conversas ao montar o componente
   useEffect(() => {
-    if (conversas.length === 0) {
+    const carregarHistorico = async () => {
+      if (!user?.id) return;
+
+      try {
+        const tokenDataString = localStorage.getItem('authToken');
+        let authHeaders = {
+          'Content-Type': 'application/json'
+        };
+        
+        if (tokenDataString) {
+          const tokenData = JSON.parse(tokenDataString);
+          if (tokenData?.token) {
+            authHeaders['Authorization'] = `Bearer ${tokenData.token}`;
+          }
+        }
+
+        const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:1000';
+        const API_BASE = API_BASE_URL.replace('/api', '');
+        
+        const response = await fetch(`${API_BASE}/agno/historico-conversa?usuario_id=${user.id}`, {
+          headers: authHeaders
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          if (data.success && data.mensagens?.length > 0) {
+            const mensagensFormatadas = data.mensagens.map(msg => ({
+              id: msg.id || Date.now(),
+              tipo: msg.tipo_remetente === 'usuario' ? 'usuario' : 'agente',
+              conteudo: msg.conteudo,
+              timestamp: msg.timestamp
+            }));
+            setConversas(mensagensFormatadas);
+            console.log('✅ Histórico carregado:', mensagensFormatadas.length, 'mensagens');
+          }
+        }
+      } catch (error) {
+        console.error('❌ Erro ao carregar histórico:', error);
+      }
+    };
+
+    carregarHistorico();
+  }, [user?.id]);
+
+  // Mensagem inicial do sistema (se não houver histórico)
+  useEffect(() => {
+    if (conversas.length === 0 && user) {
       const mensagemInicial = {
         id: Date.now(),
         tipo: 'sistema',
@@ -48,7 +99,7 @@ const AIPage = () => {
       };
       setConversas([mensagemInicial]);
     }
-  }, [user?.nome]);
+  }, [user, conversas.length]);
 
   // Auto-scroll para última mensagem
   useEffect(() => {
@@ -100,7 +151,134 @@ const AIPage = () => {
     }
   };
 
-  // Enviar mensagem para o agente Agno (com processamento inteligente)
+  // ============================================
+  // FUNÇÕES DE VOZ
+  // ============================================
+
+  // Iniciar gravação de voz
+  const iniciarGravacao = () => {
+    if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+      alert('Reconhecimento de voz não é suportado neste navegador.');
+      return;
+    }
+
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const recognition = new SpeechRecognition();
+
+    recognition.lang = 'pt-BR';
+    recognition.continuous = false;
+    recognition.interimResults = false;
+
+    recognition.onstart = () => {
+      setGravando(true);
+    };
+
+    recognition.onresult = (event) => {
+      const transcript = event.results[0][0].transcript;
+      setMensagem(transcript);
+    };
+
+    recognition.onerror = () => {
+      setGravando(false);
+    };
+
+    recognition.onend = () => {
+      setGravando(false);
+    };
+
+    recognitionRef.current = recognition;
+    recognition.start();
+  };
+
+  const pararGravacao = () => {
+    if (recognitionRef.current) {
+      recognitionRef.current.stop();
+    }
+  };
+
+  // Função para síntese de fala
+  const falarTexto = (texto) => {
+    if (!vozHabilitada || !('speechSynthesis' in window)) {
+      return;
+    }
+
+    window.speechSynthesis.cancel();
+
+    const utterance = new SpeechSynthesisUtterance(texto);
+    utterance.lang = 'pt-BR';
+    utterance.rate = 0.9;
+    utterance.pitch = 1;
+
+    utterance.onstart = () => {
+      setFalando(true);
+    };
+
+    utterance.onend = () => {
+      setFalando(false);
+    };
+
+    utterance.onerror = () => {
+      setFalando(false);
+    };
+
+    synthesisRef.current = utterance;
+    window.speechSynthesis.speak(utterance);
+  };
+
+  const pararFala = () => {
+    window.speechSynthesis.cancel();
+    setFalando(false);
+  };
+
+  const alternarVoz = () => {
+    setVozHabilitada(!vozHabilitada);
+    if (falando) {
+      pararFala();
+    }
+  };
+
+  // ============================================
+  // FUNÇÕES DE LOCALSTORAGE
+  // ============================================
+
+  const getStorageKey = () => `matias_conversas_${user?.id || 'anonymous'}`;
+
+  const salvarConversasLocal = (novasConversas) => {
+    try {
+      const storageKey = getStorageKey();
+      const dataToSave = {
+        conversas: novasConversas,
+        timestamp: new Date().toISOString(),
+        userId: user?.id || 'anonymous'
+      };
+      localStorage.setItem(storageKey, JSON.stringify(dataToSave));
+    } catch (error) {
+      console.error('Erro ao salvar conversas:', error);
+    }
+  };
+
+  const limparHistorico = () => {
+    try {
+      const storageKey = getStorageKey();
+      localStorage.removeItem(storageKey);
+      
+      const mensagemInicial = {
+        id: Date.now(),
+        tipo: 'sistema',
+        conteudo: `Olá ${user?.nome || 'usuário'}! 👋\n\nSou o assistente de IA do OFIX, especializado em:\n\n🔧 Diagnósticos automotivos\n🚗 Gestão de peças e estoque\n💼 Suporte comercial\n📊 Análise de dados operacionais\n\nComo posso ajudá-lo hoje?`,
+        timestamp: new Date().toISOString()
+      };
+      setConversas([mensagemInicial]);
+      salvarConversasLocal([mensagemInicial]);
+    } catch (error) {
+      console.error('Erro ao limpar histórico:', error);
+    }
+  };
+
+  // ============================================
+  // ENVIAR MENSAGEM
+  // ============================================
+
   const enviarMensagem = async () => {
     if (!mensagem.trim() || carregando) return;
 
@@ -111,7 +289,11 @@ const AIPage = () => {
       timestamp: new Date().toISOString()
     };
 
-    setConversas(prev => [...prev, novaMensagem]);
+    setConversas(prev => {
+      const novasConversas = [...prev, novaMensagem];
+      salvarConversasLocal(novasConversas);
+      return novasConversas;
+    });
     setMensagem('');
     setCarregando(true);
 
@@ -193,11 +375,28 @@ const AIPage = () => {
           metadata: data.metadata || {}
         };
 
-        setConversas(prev => [...prev, respostaAgente]);
+        setConversas(prev => {
+          const novasConversas = [...prev, respostaAgente];
+          salvarConversasLocal(novasConversas); // Salvar no localStorage
+          return novasConversas;
+        });
         
-        // Atualizar session_id se retornado
-        if (data.session_id && !sessionId) {
-          setSessionId(data.session_id);
+        // Falar resposta automaticamente se voz estiver habilitada
+        if (vozHabilitada && responseContent) {
+          const textoLimpo = responseContent
+            .replace(/\*\*(.*?)\*\*/g, '$1') // Remove **bold**
+            .replace(/\*(.*?)\*/g, '$1') // Remove *italic*
+            .replace(/#{1,6}\s/g, '') // Remove headers #
+            .replace(/```[\s\S]*?```/g, '') // Remove code blocks
+            .replace(/`([^`]+)`/g, '$1') // Remove inline code
+            .replace(/\n{2,}/g, '. ') // Converte quebras duplas em pausa
+            .replace(/\n/g, ' ') // Converte quebras simples em espaço
+            .replace(/[•✅❌📋🔧🚗💼📊]/g, '') // Remove emojis
+            .trim();
+            
+          if (textoLimpo.length > 0 && textoLimpo.length < 500) {
+            falarTexto(textoLimpo);
+          }
         }
       } else {
         throw new Error(`Erro na API: ${response.status}`);
@@ -229,6 +428,18 @@ const AIPage = () => {
   // Inicializar conexão
   useEffect(() => {
     verificarConexao();
+  }, []);
+
+  // Limpeza ao desmontar componente
+  useEffect(() => {
+    return () => {
+      if (recognitionRef.current) {
+        recognitionRef.current.stop();
+      }
+      if (window.speechSynthesis) {
+        window.speechSynthesis.cancel();
+      }
+    };
   }, []);
 
   const getStatusIcon = () => {
