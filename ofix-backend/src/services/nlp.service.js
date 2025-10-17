@@ -153,10 +153,20 @@ export class NLPService {
         
         console.log('   🔍 Iniciando extração de nome...');
         console.log('   📝 Mensagem original:', mensagem);
+        console.log('   🚗 Veículo já detectado:', entidades.veiculo);
+        
+        // Se já detectamos um veículo, remover ele da mensagem antes de buscar o nome
+        let mensagemSemVeiculo = mensagem;
+        if (entidades.veiculo) {
+            // Remover "para o Gol", "do Gol", etc
+            const regexRemoverVeiculo = new RegExp(`\\b(para o|para a|do|da)\\s+${entidades.veiculo}\\b`, 'gi');
+            mensagemSemVeiculo = mensagem.replace(regexRemoverVeiculo, '');
+            console.log('   📝 Mensagem sem veículo:', mensagemSemVeiculo);
+        }
         
         // Tentar padrão explícito primeiro: "Nome: João" ou "Cliente: João"
         const padraoExplicito = /(?:nome|cliente):\s*([A-ZÀ-Üa-zà-ü]+(?:\s+[A-ZÀ-Üa-zà-ü]+)*)/i;
-        const matchExplicito = mensagem.match(padraoExplicito);
+        const matchExplicito = mensagemSemVeiculo.match(padraoExplicito);
         
         console.log('   🔎 Match explícito (Nome:/Cliente:):', matchExplicito);
         
@@ -172,7 +182,7 @@ export class NLPService {
         } else {
             // Tentar padrões contextuais: "do João", "da Maria", etc
             const padraoNome = /(?:do|da|para o|para a|de|cliente)\s+([A-ZÀ-Üa-zà-ü]+(?:\s+[A-ZÀ-Üa-zà-ü]+)*?)(?:\s+na|\s+no|\s+às|\s+as|\s+em|\s+,|\s*$)/i;
-            const matchNome = mensagem.match(padraoNome);
+            const matchNome = mensagemSemVeiculo.match(padraoNome);
             
             console.log('   🔎 Match contextual (do/da/para):', matchNome);
             
