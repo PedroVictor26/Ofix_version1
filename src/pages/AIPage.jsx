@@ -7,6 +7,7 @@ import {
   Loader2, 
   Settings, 
   MessageCircle,
+  MessageSquare,
   Zap,
   AlertCircle,
   CheckCircle,
