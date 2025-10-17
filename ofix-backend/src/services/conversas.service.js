@@ -4,21 +4,68 @@ const prisma = new PrismaClient();
 
 class ConversasService {
     
-    // Salvar nova conversa
+    // Salvar nova conversa (cria ou reutiliza conversa ativa e adiciona mensagens)
     static async salvarConversa({ usuarioId, pergunta, resposta, contexto, timestamp }) {
         try {
-            const conversa = await prisma.conversaMatias.create({
-                data: {
-                    usuarioId: usuarioId.toString(),
-                    pergunta,
-                    resposta,
-                    contexto: contexto || '{}',
-                    timestamp: timestamp || new Date()
+            // NOTA: usuarioId vem como UUID string, mas o schema espera Int
+            // Vamos usar uma solução temporária: hash do UUID para Int
+            // TODO: Migrar schema para usar UUID em vez de Int
+            const userIdInt = parseInt(usuarioId.replace(/-/g, '').substring(0, 9), 16) % 2147483647;
+            
+            // 1. Buscar ou criar conversa ativa para este usuário
+            let conversa = await prisma.conversaMatias.findFirst({
+                where: {
+                    userId: userIdInt,
+                    ativa: true
+                },
+                orderBy: {
+                    createdAt: 'desc'
                 }
             });
             
-            console.log('✅ Conversa salva:', conversa.id);
-            return conversa;
+            // Se não existe conversa ativa, criar uma nova
+            if (!conversa) {
+                conversa = await prisma.conversaMatias.create({
+                    data: {
+                        userId: userIdInt,
+                        titulo: `Conversa - ${new Date().toLocaleDateString('pt-BR')}`,
+                        ativa: true
+                    }
+                });
+                console.log('🆕 Nova conversa criada:', conversa.id);
+            }
+            
+            // 2. Salvar mensagem do usuário
+            await prisma.mensagemMatias.create({
+                data: {
+                    conversaId: conversa.id,
+                    tipo: 'user',
+                    conteudo: pergunta,
+                    metadata: {
+                        timestamp: timestamp || new Date(),
+                        contexto: contexto || {}
+                    }
+                }
+            });
+            
+            // 3. Salvar resposta do Matias
+            const mensagemResposta = await prisma.mensagemMatias.create({
+                data: {
+                    conversaId: conversa.id,
+                    tipo: 'matias',
+                    conteudo: resposta,
+                    metadata: {
+                        timestamp: timestamp || new Date(),
+                        contexto: contexto || {}
+                    }
+                }
+            });
+            
+            console.log('✅ Mensagens salvas na conversa:', conversa.id);
+            return {
+                conversaId: conversa.id,
+                mensagemId: mensagemResposta.id
+            };
             
         } catch (error) {
             console.error('❌ Erro ao salvar conversa:', error);
@@ -29,21 +76,24 @@ class ConversasService {
     // Obter histórico de conversas de um usuário
     static async obterHistorico(usuarioId, limite = 10) {
         try {
+            // Converter UUID para Int (mesmo método usado em salvarConversa)
+            const userIdInt = parseInt(usuarioId.replace(/-/g, '').substring(0, 9), 16) % 2147483647;
+            
             const conversas = await prisma.conversaMatias.findMany({
                 where: {
-                    usuarioId: usuarioId.toString()
+                    userId: userIdInt
+                },
+                include: {
+                    mensagens: {
+                        orderBy: {
+                            createdAt: 'asc'
+                        }
+                    }
                 },
                 orderBy: {
-                    timestamp: 'desc'
+                    createdAt: 'desc'
                 },
-                take: limite,
-                select: {
-                    id: true,
-                    pergunta: true,
-                    resposta: true,
-                    timestamp: true,
-                    contexto: true
-                }
+                take: limite
             });
             
             console.log(`📚 Histórico recuperado: ${conversas.length} conversas para usuário ${usuarioId}`);
@@ -58,26 +108,35 @@ class ConversasService {
     // Buscar conversas por palavra-chave
     static async buscarConversas(usuarioId, palavraChave) {
         try {
+            const userIdInt = parseInt(usuarioId.replace(/-/g, '').substring(0, 9), 16) % 2147483647;
+            
             const conversas = await prisma.conversaMatias.findMany({
                 where: {
-                    usuarioId: usuarioId.toString(),
-                    OR: [
-                        {
-                            pergunta: {
-                                contains: palavraChave,
-                                mode: 'insensitive'
-                            }
-                        },
-                        {
-                            resposta: {
+                    userId: userIdInt,
+                    mensagens: {
+                        some: {
+                            conteudo: {
                                 contains: palavraChave,
                                 mode: 'insensitive'
                             }
                         }
-                    ]
+                    }
+                },
+                include: {
+                    mensagens: {
+                        where: {
+                            conteudo: {
+                                contains: palavraChave,
+                                mode: 'insensitive'
+                            }
+                        },
+                        orderBy: {
+                            createdAt: 'asc'
+                        }
+                    }
                 },
                 orderBy: {
-                    timestamp: 'desc'
+                    createdAt: 'desc'
                 },
                 take: 20
             });
@@ -94,9 +153,11 @@ class ConversasService {
     // Estatísticas de conversas
     static async obterEstatisticasConversas(usuarioId) {
         try {
+            const userIdInt = parseInt(usuarioId.replace(/-/g, '').substring(0, 9), 16) % 2147483647;
+            
             const total = await prisma.conversaMatias.count({
                 where: {
-                    usuarioId: usuarioId.toString()
+                    userId: userIdInt
                 }
             });
             
@@ -105,29 +166,40 @@ class ConversasService {
             
             const conversasHoje = await prisma.conversaMatias.count({
                 where: {
-                    usuarioId: usuarioId.toString(),
-                    timestamp: {
+                    userId: userIdInt,
+                    createdAt: {
                         gte: hoje
+                    }
+                }
+            });
+            
+            const totalMensagens = await prisma.mensagemMatias.count({
+                where: {
+                    conversa: {
+                        userId: userIdInt
                     }
                 }
             });
             
             const ultimaConversa = await prisma.conversaMatias.findFirst({
                 where: {
-                    usuarioId: usuarioId.toString()
+                    userId: userIdInt
                 },
                 orderBy: {
-                    timestamp: 'desc'
+                    updatedAt: 'desc'
                 },
                 select: {
-                    timestamp: true
+                    updatedAt: true,
+                    titulo: true
                 }
             });
             
             return {
                 total_conversas: total,
                 conversas_hoje: conversasHoje,
-                ultima_conversa: ultimaConversa?.timestamp,
+                total_mensagens: totalMensagens,
+                ultima_conversa: ultimaConversa?.updatedAt,
+                ultima_conversa_titulo: ultimaConversa?.titulo,
                 usuario_id: usuarioId
             };
             

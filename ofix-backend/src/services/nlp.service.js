@@ -15,40 +15,40 @@ export class NLPService {
     static detectarIntencao(mensagem) {
         const msg = mensagem.toLowerCase().trim();
         
-        // INTENÇÃO: AGENDAMENTO
-        const padraoAgendamento = /\b(agendar|marcar|consulta|horário|data|segunda|terça|quarta|quinta|sexta|sábado|reservar|agendar|hora|dia)\b/i;
+        // INTENÇÃO: AJUDA (verificar primeiro para não confundir)
+        const padraoAjuda = /\b(ajuda|help|o que pode|como funciona|pode fazer|comandos|menu|opções)\b/i;
+        if (padraoAjuda.test(msg)) {
+            return 'AJUDA';
+        }
+        
+        // INTENÇÃO: AGENDAMENTO (incluir mais variações)
+        const padraoAgendamento = /\b(agendar|agendamento|marcar|marca|marcação|reservar|reserva|horário|horario|data|segunda|terça|terca|quarta|quinta|sexta|sábado|sabado|domingo|revisão|revisao|troca|manutenção|manutencao|às|as)\b/i;
         if (padraoAgendamento.test(msg)) {
             return 'AGENDAMENTO';
         }
         
         // INTENÇÃO: CONSULTA ORDEM DE SERVIÇO
-        const padraoOS = /\b(ordem|serviço|os|status|andamento|pronto|terminado|concluído|situação|verificar)\b/i;
+        const padraoOS = /\b(ordem|serviço|servico|os|status|andamento|pronto|terminado|concluído|concluido|situação|situacao|verificar|consultar os|meu carro|veículo|veiculo)\b/i;
         if (padraoOS.test(msg)) {
             return 'CONSULTA_OS';
         }
         
         // INTENÇÃO: CONSULTA ESTOQUE
-        const padraoEstoque = /\b(peça|peças|estoque|disponível|tem|preciso|filtro|óleo|pneu|vela|bateria)\b/i;
+        const padraoEstoque = /\b(peça|peca|peças|pecas|estoque|disponível|disponivel|tem em|preciso de|filtro|óleo|oleo|pneu|vela|bateria|pastilha|disco|amortecedor)\b/i;
         if (padraoEstoque.test(msg)) {
             return 'CONSULTA_ESTOQUE';
         }
         
         // INTENÇÃO: ESTATÍSTICAS
-        const padraoEstatisticas = /\b(quantos|total|relatório|resumo|hoje|mês|semana|estatística|números|dados)\b/i;
+        const padraoEstatisticas = /\b(quantos|quanto|total|relatório|relatorio|resumo|hoje|ontem|mês|mes|semana|estatística|estatistica|números|numeros|dados|carros atendidos|faturamento)\b/i;
         if (padraoEstatisticas.test(msg)) {
             return 'ESTATISTICAS';
         }
         
         // INTENÇÃO: CONSULTA CLIENTE
-        const padraoCliente = /\b(cliente|clientes|cadastro|telefone|cpf|endereço|dados)\b/i;
+        const padraoCliente = /\b(cliente|clientes|cadastro|telefone|cpf|cnpj|endereço|endereco|contato|dados do cliente)\b/i;
         if (padraoCliente.test(msg)) {
             return 'CONSULTA_CLIENTE';
-        }
-        
-        // INTENÇÃO: AJUDA
-        const padraoAjuda = /\b(ajuda|help|o que|como|funciona|pode fazer|comandos)\b/i;
-        if (padraoAjuda.test(msg)) {
-            return 'AJUDA';
         }
         
         // DEFAULT: Conversa geral
@@ -131,15 +131,7 @@ export class NLPService {
             }
         }
         
-        // 4. EXTRAIR NOME DO CLIENTE
-        // Padrões: "para o João", "do João", "da Maria", "cliente João"
-        const padraoNome = /(?:para o?|do|da|cliente|sr\.?|sra\.?)\s+([A-ZÀÁÂÃÄÉÈÊËÍÏÓÔÕÖÚÙÛÜÇ][a-zàáâãäéèêëíïóôõöúùûüç]+(?:\s+[A-ZÀÁÂÃÄÉÈÊËÍÏÓÔÕÖÚÙÛÜÇ][a-zàáâãäéèêëíïóôõöúùûüç]+)*)/;
-        const matchNome = mensagem.match(padraoNome);
-        if (matchNome) {
-            entidades.cliente = matchNome[1].trim();
-        }
-        
-        // 5. EXTRAIR MODELO DE VEÍCULO
+        // 4. EXTRAIR MODELO DE VEÍCULO (fazer ANTES do nome para não confundir)
         const modelosComuns = [
             'Gol', 'Civic', 'Corolla', 'Uno', 'Palio', 'Fox', 'Fiesta',
             'HB20', 'Onix', 'Voyage', 'Sandero', 'Kicks', 'Compass',
@@ -152,6 +144,19 @@ export class NLPService {
             if (regex.test(mensagem)) {
                 entidades.veiculo = modelo;
                 break;
+            }
+        }
+        
+        // 5. EXTRAIR NOME DO CLIENTE
+        // Padrões melhorados: "do João", "da Maria", "para o João", "cliente João"
+        // IMPORTANTE: Ignorar se for um modelo de veículo
+        const padraoNome = /(?:do|da|para o|para a|cliente|sr\.?|sra\.?)\s+([A-ZÀÁÂÃÄÉÈÊËÍÏÓÔÕÖÚÙÛÜÇ][a-zàáâãäéèêëíïóôõöúùûüç]+(?:\s+[A-ZÀÁÂÃÄÉÈÊËÍÏÓÔÕÖÚÙÛÜÇ][a-zàáâãäéèêëíïóôõöúùûüç]+)*)/;
+        const matchNome = mensagem.match(padraoNome);
+        if (matchNome) {
+            const nomeExtraido = matchNome[1].trim();
+            // Verificar se não é um modelo de veículo
+            if (!modelosComuns.some(m => m.toLowerCase() === nomeExtraido.toLowerCase())) {
+                entidades.cliente = nomeExtraido;
             }
         }
         

@@ -259,10 +259,12 @@ async function processarAgendamento(mensagem, usuario_id) {
             };
         }
         
-        // 3. BUSCAR CLIENTE NO BANCO
+        // 3. BUSCAR CLIENTE NO BANCO (com busca inteligente)
         let cliente = null;
+        let clientesSugeridos = [];
         
         if (entidades.cliente) {
+            // Busca exata primeiro
             cliente = await prisma.cliente.findFirst({
                 where: {
                     nomeCompleto: {
@@ -274,6 +276,28 @@ async function processarAgendamento(mensagem, usuario_id) {
                     veiculos: true
                 }
             });
+            
+            // Se não encontrou, buscar clientes similares para sugestão
+            if (!cliente) {
+                const palavrasBusca = entidades.cliente.split(' ').filter(p => p.length > 2);
+                
+                if (palavrasBusca.length > 0) {
+                    clientesSugeridos = await prisma.cliente.findMany({
+                        where: {
+                            OR: palavrasBusca.map(palavra => ({
+                                nomeCompleto: {
+                                    contains: palavra,
+                                    mode: 'insensitive'
+                                }
+                            }))
+                        },
+                        include: {
+                            veiculos: true
+                        },
+                        take: 5
+                    });
+                }
+            }
         } else if (entidades.placa) {
             const veiculo = await prisma.veiculo.findFirst({
                 where: {
@@ -290,39 +314,91 @@ async function processarAgendamento(mensagem, usuario_id) {
             cliente = veiculo?.cliente;
         }
         
+        // Se não encontrou cliente, mostrar sugestões ou listar todos
         if (!cliente) {
+            if (clientesSugeridos.length > 0) {
+                return {
+                    success: false,
+                    response: `🔍 **Cliente "${entidades.cliente}" não encontrado**\n\n**Clientes similares encontrados:**\n${clientesSugeridos.map((c, i) => `${i + 1}. ${c.nomeCompleto}${c.telefone ? ` - ${c.telefone}` : ''}${c.veiculos.length > 0 ? `\n   🚗 ${c.veiculos.map(v => `${v.marca} ${v.modelo}`).join(', ')}` : ''}`).join('\n\n')}\n\n💡 **Digite o número ou nome completo do cliente correto**`,
+                    tipo: 'sugestao',
+                    sugestoes: clientesSugeridos
+                };
+            }
+            
+            // Se não tem sugestões, listar alguns clientes recentes
+            const clientesRecentes = await prisma.cliente.findMany({
+                include: {
+                    veiculos: true
+                },
+                orderBy: {
+                    createdAt: 'desc'
+                },
+                take: 5
+            });
+            
+            if (clientesRecentes.length > 0) {
+                return {
+                    success: false,
+                    response: `❌ **Cliente não encontrado**\n\n${entidades.cliente ? `Não encontrei "${entidades.cliente}" no sistema.` : 'Nenhum cliente especificado.'}\n\n**Clientes recentes cadastrados:**\n${clientesRecentes.map((c, i) => `${i + 1}. ${c.nomeCompleto}${c.veiculos.length > 0 ? `\n   🚗 ${c.veiculos.map(v => `${v.marca} ${v.modelo}`).join(', ')}` : ''}`).join('\n\n')}\n\n💡 **Opções:**\n• Digite o nome completo do cliente\n• Ou cadastre um novo cliente primeiro`,
+                    tipo: 'erro',
+                    clientes_disponiveis: clientesRecentes
+                };
+            }
+            
             return {
                 success: false,
-                response: `❌ **Cliente não encontrado**\n\n${entidades.cliente ? `Não encontrei cliente com nome "${entidades.cliente}".` : ''}\n${entidades.placa ? `Não encontrei veículo com placa "${entidades.placa}".` : ''}\n\n💡 **Verifique:**\n• O nome está correto?\n• O cliente já está cadastrado no sistema?`,
+                response: `❌ **Nenhum cliente cadastrado**\n\n${entidades.cliente ? `Não encontrei "${entidades.cliente}".` : ''}\n\n💡 **É necessário cadastrar o cliente primeiro:**\n1. Acesse "Clientes" no menu\n2. Clique em "Novo Cliente"\n3. Preencha os dados\n4. Depois volte aqui para agendar`,
                 tipo: 'erro'
             };
         }
         
-        // 4. BUSCAR VEÍCULO
+        // 4. BUSCAR VEÍCULO (com busca inteligente)
         let veiculo = null;
         
         if (entidades.placa) {
+            // Busca por placa (mais precisa)
             veiculo = cliente.veiculos.find(v => v.placa === entidades.placa);
         } else if (entidades.veiculo) {
-            veiculo = cliente.veiculos.find(v => 
-                v.modelo.toLowerCase().includes(entidades.veiculo.toLowerCase())
+            // Busca por modelo (pode ter múltiplos)
+            const veiculosEncontrados = cliente.veiculos.filter(v => 
+                v.modelo.toLowerCase().includes(entidades.veiculo.toLowerCase()) ||
+                v.marca.toLowerCase().includes(entidades.veiculo.toLowerCase())
             );
+            
+            if (veiculosEncontrados.length === 1) {
+                veiculo = veiculosEncontrados[0];
+            } else if (veiculosEncontrados.length > 1) {
+                return {
+                    success: false,
+                    response: `🚗 **Múltiplos veículos "${entidades.veiculo}" encontrados**\n\n**Cliente:** ${cliente.nomeCompleto}\n\n**Escolha o veículo:**\n${veiculosEncontrados.map((v, i) => `${i + 1}. ${v.marca} ${v.modelo} ${v.anoModelo || ''} - ${v.placa}${v.cor ? ` (${v.cor})` : ''}`).join('\n')}\n\n💡 Digite o número ou especifique a placa (ex: "ABC-1234")`,
+                    tipo: 'multiplos',
+                    opcoes: veiculosEncontrados
+                };
+            }
         }
         
+        // Se não encontrou e o cliente tem veículos, listar para escolha
         if (!veiculo && cliente.veiculos.length > 0) {
-            return {
-                success: false,
-                response: `🚗 **Veículo não identificado**\n\n**Cliente:** ${cliente.nomeCompleto}\n\n**Veículos disponíveis:**\n${cliente.veiculos.map((v, i) => `${i + 1}. ${v.marca} ${v.modelo} - ${v.placa}${v.cor ? ` (${v.cor})` : ''}`).join('\n')}\n\n💡 Qual veículo deseja agendar?`,
-                tipo: 'pergunta',
-                opcoes: cliente.veiculos
-            };
+            // Se tem apenas 1 veículo, usar automaticamente
+            if (cliente.veiculos.length === 1) {
+                veiculo = cliente.veiculos[0];
+                console.log(`   ✅ Único veículo do cliente selecionado automaticamente: ${veiculo.marca} ${veiculo.modelo}`);
+            } else {
+                return {
+                    success: false,
+                    response: `🚗 **${entidades.veiculo ? `Veículo "${entidades.veiculo}" não encontrado` : 'Qual veículo deseja agendar?'}**\n\n**Cliente:** ${cliente.nomeCompleto}\n\n**Veículos disponíveis:**\n${cliente.veiculos.map((v, i) => `${i + 1}. ${v.marca} ${v.modelo}${v.anoModelo ? ` ${v.anoModelo}` : ''} - ${v.placa}${v.cor ? ` (${v.cor})` : ''}`).join('\n')}\n\n💡 Digite o número, modelo ou placa do veículo`,
+                    tipo: 'pergunta',
+                    opcoes: cliente.veiculos
+                };
+            }
         }
         
         if (!veiculo) {
             return {
                 success: false,
-                response: `❌ **Nenhum veículo cadastrado**\n\n**Cliente:** ${cliente.nomeCompleto}\n\n💡 É necessário cadastrar um veículo antes de agendar.`,
-                tipo: 'erro'
+                response: `❌ **Nenhum veículo cadastrado**\n\n**Cliente:** ${cliente.nomeCompleto}\n\n💡 **É necessário cadastrar um veículo primeiro:**\n1. Acesse "Clientes" no menu\n2. Selecione "${cliente.nomeCompleto}"\n3. Adicione um veículo\n4. Depois volte aqui para agendar`,
+                tipo: 'erro',
+                cliente_id: cliente.id
             };
         }
         
