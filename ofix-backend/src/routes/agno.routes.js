@@ -390,8 +390,11 @@ async function processarAgendamento(mensagem, usuario_id) {
                 };
             }
             
-            // Se não tem sugestões, listar alguns clientes recentes
+            // Se não tem sugestões, listar alguns clientes recentes (FILTRADO POR OFICINA)
+            const whereClientesRecentes = oficinaId ? { oficinaId } : {};
+            
             const clientesRecentes = await prisma.cliente.findMany({
+                where: whereClientesRecentes,
                 include: {
                     veiculos: true
                 },
@@ -400,6 +403,9 @@ async function processarAgendamento(mensagem, usuario_id) {
                 },
                 take: 5
             });
+            
+            console.log('   📋 Clientes recentes encontrados:', clientesRecentes.length);
+            console.log('   🏢 Filtrado por oficinaId:', oficinaId || 'SEM FILTRO');
             
             if (clientesRecentes.length > 0) {
                 return {
