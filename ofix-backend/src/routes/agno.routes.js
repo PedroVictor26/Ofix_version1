@@ -7,6 +7,8 @@ import jwt from 'jsonwebtoken';
 import ConversasService from '../services/conversas.service.js';
 import AgendamentosService from '../services/agendamentos.service.js';
 import ConsultasOSService from '../services/consultasOS.service.js';
+import NLPService from '../services/nlp.service.js';
+import prisma from '../config/database.js';
 
 const router = express.Router();
 
@@ -146,6 +148,423 @@ router.post('/chat-public', async (req, res) => {
         });
     }
 });
+
+// ============================================================
+// 🤖 CHAT INTELIGENTE - PROCESSAMENTO DE LINGUAGEM NATURAL
+// ============================================================
+
+router.post('/chat-inteligente', async (req, res) => {
+    try {
+        const { message, usuario_id } = req.body;
+        
+        if (!message) {
+            return res.status(400).json({ 
+                success: false,
+                error: 'Mensagem é obrigatória' 
+            });
+        }
+
+        console.log('🎯 Chat Inteligente - Mensagem:', message.substring(0, 80) + '...');
+        
+        // 1. DETECTAR INTENÇÃO
+        const intencao = NLPService.detectarIntencao(message);
+        console.log('   Intenção detectada:', intencao);
+        
+        // 2. PROCESSAR BASEADO NA INTENÇÃO
+        let response;
+        
+        switch (intencao) {
+            case 'AGENDAMENTO':
+                response = await processarAgendamento(message, usuario_id);
+                break;
+                
+            case 'CONSULTA_OS':
+                response = await processarConsultaOS(message);
+                break;
+                
+            case 'CONSULTA_ESTOQUE':
+                response = await processarConsultaEstoque(message);
+                break;
+                
+            case 'ESTATISTICAS':
+                response = await processarEstatisticas(message);
+                break;
+                
+            case 'CONSULTA_CLIENTE':
+                response = await processarConsultaCliente(message);
+                break;
+                
+            case 'AJUDA':
+                response = {
+                    success: true,
+                    response: NLPService.gerarMensagemAjuda(),
+                    tipo: 'ajuda'
+                };
+                break;
+                
+            default:
+                // Conversa geral - pode enviar para Agno Agent se configurado
+                response = await processarConversaGeral(message);
+                break;
+        }
+        
+        // 3. SALVAR CONVERSA NO HISTÓRICO
+        try {
+            if (usuario_id) {
+                await ConversasService.salvarConversa({
+                    usuarioId: usuario_id,
+                    pergunta: message,
+                    resposta: response.response || 'Sem resposta',
+                    contexto: JSON.stringify({ intencao, ...response.metadata }),
+                    timestamp: new Date()
+                });
+            }
+        } catch (saveError) {
+            console.error('⚠️ Erro ao salvar conversa (não crítico):', saveError.message);
+        }
+        
+        // 4. RETORNAR RESPOSTA
+        return res.json(response);
+        
+    } catch (error) {
+        console.error('❌ Erro no chat inteligente:', error);
+        return res.status(500).json({
+            success: false,
+            error: 'Erro ao processar mensagem',
+            message: error.message
+        });
+    }
+});
+
+// ============================================================================
+// 📅 FUNÇÃO: PROCESSAR AGENDAMENTO
+// ============================================================================
+
+async function processarAgendamento(mensagem, usuario_id) {
+    try {
+        // 1. EXTRAIR ENTIDADES
+        const entidades = NLPService.extrairEntidadesAgendamento(mensagem);
+        console.log('   📋 Entidades:', JSON.stringify(entidades, null, 2));
+        
+        // 2. VALIDAR DADOS NECESSÁRIOS
+        const validacao = NLPService.validarDadosAgendamento(entidades);
+        
+        if (!validacao.valido) {
+            return {
+                success: false,
+                response: `📋 **Para agendar, preciso de mais informações:**\n\n${validacao.faltando.map((item, i) => `${i + 1}. ${item}`).join('\n')}\n\n💡 **Exemplo:** "Agendar revisão para o Gol do João na segunda às 14h"`,
+                tipo: 'pergunta',
+                faltando: validacao.faltando,
+                entidades_detectadas: entidades
+            };
+        }
+        
+        // 3. BUSCAR CLIENTE NO BANCO
+        let cliente = null;
+        
+        if (entidades.cliente) {
+            cliente = await prisma.cliente.findFirst({
+                where: {
+                    nomeCompleto: {
+                        contains: entidades.cliente,
+                        mode: 'insensitive'
+                    }
+                },
+                include: {
+                    veiculos: true
+                }
+            });
+        } else if (entidades.placa) {
+            const veiculo = await prisma.veiculo.findFirst({
+                where: {
+                    placa: entidades.placa
+                },
+                include: {
+                    cliente: {
+                        include: {
+                            veiculos: true
+                        }
+                    }
+                }
+            });
+            cliente = veiculo?.cliente;
+        }
+        
+        if (!cliente) {
+            return {
+                success: false,
+                response: `❌ **Cliente não encontrado**\n\n${entidades.cliente ? `Não encontrei cliente com nome "${entidades.cliente}".` : ''}\n${entidades.placa ? `Não encontrei veículo com placa "${entidades.placa}".` : ''}\n\n💡 **Verifique:**\n• O nome está correto?\n• O cliente já está cadastrado no sistema?`,
+                tipo: 'erro'
+            };
+        }
+        
+        // 4. BUSCAR VEÍCULO
+        let veiculo = null;
+        
+        if (entidades.placa) {
+            veiculo = cliente.veiculos.find(v => v.placa === entidades.placa);
+        } else if (entidades.veiculo) {
+            veiculo = cliente.veiculos.find(v => 
+                v.modelo.toLowerCase().includes(entidades.veiculo.toLowerCase())
+            );
+        }
+        
+        if (!veiculo && cliente.veiculos.length > 0) {
+            return {
+                success: false,
+                response: `🚗 **Veículo não identificado**\n\n**Cliente:** ${cliente.nomeCompleto}\n\n**Veículos disponíveis:**\n${cliente.veiculos.map((v, i) => `${i + 1}. ${v.marca} ${v.modelo} - ${v.placa}${v.cor ? ` (${v.cor})` : ''}`).join('\n')}\n\n💡 Qual veículo deseja agendar?`,
+                tipo: 'pergunta',
+                opcoes: cliente.veiculos
+            };
+        }
+        
+        if (!veiculo) {
+            return {
+                success: false,
+                response: `❌ **Nenhum veículo cadastrado**\n\n**Cliente:** ${cliente.nomeCompleto}\n\n💡 É necessário cadastrar um veículo antes de agendar.`,
+                tipo: 'erro'
+            };
+        }
+        
+        // 5. CALCULAR DATA E HORA
+        let dataAgendamento;
+        
+        if (entidades.dataEspecifica) {
+            dataAgendamento = entidades.dataEspecifica;
+        } else if (entidades.diaSemana) {
+            dataAgendamento = NLPService.calcularProximaData(entidades.diaSemana);
+        } else {
+            return {
+                success: false,
+                response: '📅 **Qual dia deseja agendar?**\n\nExemplos: "segunda", "terça", "20/10"',
+                tipo: 'pergunta'
+            };
+        }
+        
+        const dataHora = new Date(`${dataAgendamento}T${entidades.hora}:00`);
+        
+        // Validar se a data não está no passado
+        if (dataHora < new Date()) {
+            return {
+                success: false,
+                response: `❌ **Data inválida**\n\nA data ${NLPService.formatarDataAmigavel(dataAgendamento)} às ${entidades.hora} já passou.\n\n💡 Escolha uma data futura.`,
+                tipo: 'erro'
+            };
+        }
+        
+        // 6. VERIFICAR DISPONIBILIDADE
+        const conflito = await prisma.agendamento.findFirst({
+            where: {
+                dataHora: dataHora,
+                status: {
+                    not: 'CANCELADO'
+                }
+            },
+            include: {
+                cliente: true
+            }
+        });
+        
+        if (conflito) {
+            return {
+                success: false,
+                response: `⏰ **Horário ocupado**\n\n${NLPService.formatarDataAmigavel(dataAgendamento)} às ${entidades.hora} já está reservado para ${conflito.cliente.nomeCompleto}.\n\n**Horários disponíveis no mesmo dia:**\n• 08:00\n• 10:00\n• 14:00\n• 16:00\n\n💡 Qual horário prefere?`,
+                tipo: 'conflito',
+                horarios_disponiveis: ['08:00', '10:00', '14:00', '16:00']
+            };
+        }
+        
+        // 7. CRIAR AGENDAMENTO! ✅
+        const agendamento = await AgendamentosService.criarAgendamento({
+            clienteId: cliente.id,
+            veiculoId: veiculo.id,
+            tipoServico: entidades.servico || 'Serviço Geral',
+            dataHora: dataHora,
+            descricao: `Agendamento via IA: ${mensagem}`,
+            status: 'AGENDADO'
+        });
+        
+        // 8. CONFIRMAR COM DETALHES
+        const dataFormatada = NLPService.formatarDataAmigavel(dataAgendamento);
+        
+        return {
+            success: true,
+            response: `✅ **Agendamento Confirmado!**\n\n📋 **Protocolo:** #${agendamento.id}\n\n👤 **Cliente:** ${cliente.nomeCompleto}\n📞 **Telefone:** ${cliente.telefone || 'Não cadastrado'}\n\n🚗 **Veículo:** ${veiculo.marca} ${veiculo.modelo}\n🔖 **Placa:** ${veiculo.placa}${veiculo.cor ? `\n🎨 **Cor:** ${veiculo.cor}` : ''}\n\n📅 **Data:** ${dataFormatada}\n⏰ **Horário:** ${entidades.hora}\n🔧 **Serviço:** ${entidades.servico || 'Serviço Geral'}\n\n${entidades.urgente ? '🚨 **Urgente** - Priorizado\n\n' : ''}💬 ${cliente.nomeCompleto.split(' ')[0]} receberá confirmação por WhatsApp.`,
+            tipo: 'confirmacao',
+            agendamento_id: agendamento.id,
+            metadata: {
+                cliente_id: cliente.id,
+                veiculo_id: veiculo.id,
+                data: dataAgendamento,
+                hora: entidades.hora
+            }
+        };
+        
+    } catch (error) {
+        console.error('❌ Erro em processarAgendamento:', error);
+        return {
+            success: false,
+            response: `❌ **Erro ao processar agendamento**\n\n${error.message}\n\n💡 Por favor, tente novamente ou contate o suporte.`,
+            tipo: 'erro'
+        };
+    }
+}
+
+// ============================================================================
+// 🔍 FUNÇÃO: PROCESSAR CONSULTA OS
+// ============================================================================
+
+async function processarConsultaOS(mensagem) {
+    try {
+        const dados = NLPService.extrairDadosConsultaOS(mensagem);
+        console.log('   🔍 Dados para consulta OS:', dados);
+        
+        const where = {};
+        
+        if (dados.numeroOS) {
+            where.id = dados.numeroOS;
+        }
+        
+        if (dados.placa) {
+            where.veiculo = {
+                placa: dados.placa
+            };
+        }
+        
+        if (dados.cliente) {
+            where.cliente = {
+                nomeCompleto: {
+                    contains: dados.cliente,
+                    mode: 'insensitive'
+                }
+            };
+        }
+        
+        if (dados.status) {
+            where.status = dados.status;
+        }
+        
+        const ordensServico = await prisma.ordemServico.findMany({
+            where,
+            include: {
+                cliente: true,
+                veiculo: true
+            },
+            orderBy: {
+                dataAbertura: 'desc'
+            },
+            take: 10
+        });
+        
+        if (ordensServico.length === 0) {
+            return {
+                success: false,
+                response: '🔍 **Nenhuma ordem de serviço encontrada**\n\n💡 Verifique os dados e tente novamente.',
+                tipo: 'vazio'
+            };
+        }
+        
+        const lista = ordensServico.map((os, i) => 
+            `${i + 1}. **OS #${os.id}** - ${os.cliente.nomeCompleto}\n   🚗 ${os.veiculo.marca} ${os.veiculo.modelo} (${os.veiculo.placa})\n   📊 Status: ${os.status}\n   📅 Abertura: ${new Date(os.dataAbertura).toLocaleDateString('pt-BR')}`
+        ).join('\n\n');
+        
+        return {
+            success: true,
+            response: `🔍 **Ordens de Serviço Encontradas** (${ordensServico.length})\n\n${lista}`,
+            tipo: 'lista',
+            total: ordensServico.length,
+            ordensServico
+        };
+        
+    } catch (error) {
+        console.error('❌ Erro em processarConsultaOS:', error);
+        return {
+            success: false,
+            response: '❌ Erro ao consultar ordens de serviço',
+            tipo: 'erro'
+        };
+    }
+}
+
+// ============================================================================
+// 📦 FUNÇÃO: PROCESSAR CONSULTA ESTOQUE
+// ============================================================================
+
+async function processarConsultaEstoque(mensagem) {
+    try {
+        // Implementar lógica de consulta de estoque
+        return {
+            success: true,
+            response: '📦 **Consulta de Estoque**\n\nFuncionalidade em desenvolvimento.',
+            tipo: 'info'
+        };
+    } catch (error) {
+        return {
+            success: false,
+            response: '❌ Erro ao consultar estoque',
+            tipo: 'erro'
+        };
+    }
+}
+
+// ============================================================================
+// 📊 FUNÇÃO: PROCESSAR ESTATÍSTICAS
+// ============================================================================
+
+async function processarEstatisticas(mensagem) {
+    try {
+        const stats = await ConsultasOSService.obterResumoOfficina('hoje');
+        
+        return {
+            success: true,
+            response: `📊 **Estatísticas de Hoje**\n\n• **Ordens de Serviço:** ${stats.total_os || 0}\n• **Agendamentos:** ${stats.agendamentos || 0}\n• **Clientes Atendidos:** ${stats.clientes || 0}\n• **Receita:** R$ ${(stats.receita || 0).toFixed(2)}`,
+            tipo: 'estatisticas',
+            stats
+        };
+    } catch (error) {
+        console.error('❌ Erro em processarEstatisticas:', error);
+        return {
+            success: false,
+            response: '❌ Erro ao buscar estatísticas',
+            tipo: 'erro'
+        };
+    }
+}
+
+// ============================================================================
+// 👤 FUNÇÃO: PROCESSAR CONSULTA CLIENTE
+// ============================================================================
+
+async function processarConsultaCliente(mensagem) {
+    try {
+        // Implementar lógica de consulta de cliente
+        return {
+            success: true,
+            response: '👤 **Consulta de Clientes**\n\nFuncionalidade em desenvolvimento.',
+            tipo: 'info'
+        };
+    } catch (error) {
+        return {
+            success: false,
+            response: '❌ Erro ao consultar cliente',
+            tipo: 'erro'
+        };
+    }
+}
+
+// ============================================================================
+// 💬 FUNÇÃO: PROCESSAR CONVERSA GERAL
+// ============================================================================
+
+async function processarConversaGeral(mensagem) {
+    // Se Agno estiver configurado, enviar para lá
+    // Senão, resposta genérica
+    return {
+        success: true,
+        response: '🤖 **Assistente Matias**\n\nComo posso ajudar?\n\n💡 Digite "ajuda" para ver o que posso fazer.',
+        tipo: 'conversa'
+    };
+}
 
 // ============================================================
 // ENDPOINTS PARA INTEGRAÇÃO COM AGNO - FUNCIONALIDADES MATIAS

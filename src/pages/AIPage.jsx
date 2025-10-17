@@ -7,6 +7,7 @@ import {
   Loader2, 
   Settings, 
   MessageCircle,
+  MessageSquare,
   Zap,
   AlertCircle,
   CheckCircle,
@@ -99,7 +100,7 @@ const AIPage = () => {
     }
   };
 
-  // Enviar mensagem para o agente Agno
+  // Enviar mensagem para o agente Agno (com processamento inteligente)
   const enviarMensagem = async () => {
     if (!mensagem.trim() || carregando) return;
 
@@ -132,15 +133,20 @@ const AIPage = () => {
         }
       }
       
-      // Usar endpoint do Agno para chat público (teste)
-      const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:1000';
-      const response = await fetch(`${API_BASE}/agno/chat-public`, {
+      // 🤖 USAR NOVO ENDPOINT INTELIGENTE COM NLP
+      // IMPORTANTE: A rota /agno está registrada FORA do prefixo /api no app.js
+      const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:1000';
+      const API_BASE = API_BASE_URL.replace('/api', ''); // Remove /api se existir
+      const response = await fetch(`${API_BASE}/agno/chat-inteligente`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
+        headers: authHeaders,
         body: JSON.stringify({
-          message: novaMensagem.conteudo // Usar conteudo da nova mensagem
+          message: novaMensagem.conteudo,
+          usuario_id: user?.id,
+          contexto_conversa: conversas.slice(-5).map(c => ({
+            tipo: c.tipo,
+            conteudo: c.conteudo
+          }))
         })
       });
 
@@ -149,6 +155,7 @@ const AIPage = () => {
         
         // Extrair o conteúdo da resposta de forma segura
         let responseContent = '';
+        let tipoResposta = 'agente'; // tipo padrão
         
         if (data.success && data.response) {
           if (typeof data.response === 'string') {
@@ -162,13 +169,19 @@ const AIPage = () => {
           } else {
             responseContent = String(data.response);
           }
+          
+          // Usar o tipo retornado pelo backend se disponível
+          if (data.tipo) {
+            tipoResposta = data.tipo; // confirmacao, pergunta, erro, ajuda, lista
+          }
         } else {
           responseContent = data.message || 'Resposta recebida do agente.';
+          tipoResposta = 'erro';
         }
         
         const respostaAgente = {
           id: Date.now() + 1,
-          tipo: 'agente',
+          tipo: tipoResposta, // Usar o tipo retornado pelo backend
           conteudo: responseContent,
           timestamp: new Date().toISOString(),
           metadata: data.metadata || {}
@@ -294,18 +307,24 @@ const AIPage = () => {
               {/* Avatar */}
               {conversa.tipo !== 'usuario' && (
                 <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
-                  conversa.tipo === 'agente' 
-                    ? 'bg-gradient-to-br from-blue-500 to-purple-500'
-                    : conversa.tipo === 'sistema'
+                  conversa.tipo === 'confirmacao' || conversa.tipo === 'sistema'
                     ? 'bg-gradient-to-br from-green-500 to-emerald-500'
-                    : 'bg-gradient-to-br from-red-500 to-orange-500'
+                    : conversa.tipo === 'erro'
+                    ? 'bg-gradient-to-br from-red-500 to-orange-500'
+                    : conversa.tipo === 'pergunta'
+                    ? 'bg-gradient-to-br from-yellow-500 to-amber-500'
+                    : 'bg-gradient-to-br from-blue-500 to-purple-500'
                 }`}>
-                  {conversa.tipo === 'agente' ? (
-                    <Bot className="w-4 h-4 text-white" />
+                  {conversa.tipo === 'confirmacao' ? (
+                    <CheckCircle className="w-4 h-4 text-white" />
+                  ) : conversa.tipo === 'erro' ? (
+                    <AlertCircle className="w-4 h-4 text-white" />
+                  ) : conversa.tipo === 'pergunta' ? (
+                    <MessageSquare className="w-4 h-4 text-white" />
                   ) : conversa.tipo === 'sistema' ? (
                     <Wrench className="w-4 h-4 text-white" />
                   ) : (
-                    <AlertCircle className="w-4 h-4 text-white" />
+                    <Bot className="w-4 h-4 text-white" />
                   )}
                 </div>
               )}
@@ -315,11 +334,13 @@ const AIPage = () => {
                 className={`max-w-2xl rounded-2xl px-4 py-3 ${
                   conversa.tipo === 'usuario'
                     ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white'
-                    : conversa.tipo === 'agente'
-                    ? 'bg-slate-100 text-slate-900 border border-slate-200'
-                    : conversa.tipo === 'sistema'
+                    : conversa.tipo === 'confirmacao' || conversa.tipo === 'sistema'
                     ? 'bg-gradient-to-r from-green-50 to-emerald-50 text-green-800 border border-green-200'
-                    : 'bg-gradient-to-r from-red-50 to-orange-50 text-red-800 border border-red-200'
+                    : conversa.tipo === 'erro'
+                    ? 'bg-gradient-to-r from-red-50 to-orange-50 text-red-800 border border-red-200'
+                    : conversa.tipo === 'pergunta'
+                    ? 'bg-gradient-to-r from-yellow-50 to-amber-50 text-yellow-800 border border-yellow-200'
+                    : 'bg-slate-100 text-slate-900 border border-slate-200'
                 }`}
               >
                 <div className="whitespace-pre-wrap text-sm leading-relaxed">
