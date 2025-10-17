@@ -50,13 +50,20 @@ export class NLPService {
         const padraoCadastro = /\b(cadastr|novo cliente|adicionar cliente|criar cliente|incluir cliente|registrar cliente)\b/i;
         const formatoDados = /(?:nome|tel|telefone|cpf|cnpj|email):\s*[^,\n]+/i;
         
+        console.log('🔍 DEBUG CADASTRO:');
+        console.log('   - Teste comando cadastro:', padraoCadastro.test(msg));
+        console.log('   - Teste formato dados:', formatoDados.test(msg));
+        console.log('   - Mensagem:', msg.substring(0, 100));
+        
         if (padraoCadastro.test(msg) || formatoDados.test(msg)) {
+            console.log('   ✅ DETECTADO COMO CADASTRAR_CLIENTE');
             return 'CADASTRAR_CLIENTE';
         }
         
         // INTENÇÃO: CONSULTA CLIENTE
         const padraoCliente = /\b(cliente|clientes|telefone|cpf|cnpj|endereço|endereco|contato|dados do cliente)\b/i;
         if (padraoCliente.test(msg)) {
+            console.log('   ℹ️ DETECTADO COMO CONSULTA_CLIENTE');
             return 'CONSULTA_CLIENTE';
         }
         
