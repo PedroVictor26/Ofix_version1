@@ -250,9 +250,49 @@ async function processarAgendamento(mensagem, usuario_id) {
         const validacao = NLPService.validarDadosAgendamento(entidades);
         
         if (!validacao.valido) {
+            // Mensagem personalizada baseada no que está faltando
+            let mensagemAjuda = '📋 **Vamos fazer seu agendamento!**\n\n';
+            
+            if (validacao.faltando.length === 4 || validacao.faltando.length === 5) {
+                // Está faltando quase tudo - dar exemplo completo
+                mensagemAjuda += '💡 **Me informe os seguintes dados:**\n\n';
+                mensagemAjuda += '• **Cliente:** Nome do cliente\n';
+                mensagemAjuda += '• **Veículo:** Modelo ou placa\n';
+                mensagemAjuda += '• **Serviço:** Tipo de manutenção (revisão, troca de óleo, etc)\n';
+                mensagemAjuda += '• **Dia:** Dia da semana ou data (segunda, terça, 20/10)\n';
+                mensagemAjuda += '• **Horário:** Hora desejada (14h, 16:00)\n\n';
+                mensagemAjuda += '**Exemplo:**\n';
+                mensagemAjuda += '"Agendar revisão para o Gol do João na segunda às 14h"';
+            } else {
+                // Está faltando apenas alguns dados - ser específico
+                mensagemAjuda += '**Informações que ainda preciso:**\n\n';
+                mensagemAjuda += validacao.faltando.map((item, i) => `${i + 1}. ${item}`).join('\n');
+                mensagemAjuda += '\n\n**Exemplo:**\n';
+                
+                // Gerar exemplo baseado no que já tem
+                const partes = [];
+                if (entidades.servico) partes.push(entidades.servico);
+                else partes.push('revisão');
+                
+                if (entidades.veiculo) partes.push(`para o ${entidades.veiculo}`);
+                else if (entidades.cliente) partes.push(`para o cliente ${entidades.cliente}`);
+                else partes.push('para o Gol do João');
+                
+                if (entidades.diaSemana || entidades.dataEspecifica) {
+                    partes.push(entidades.diaTexto || new Date(entidades.dataEspecifica).toLocaleDateString('pt-BR'));
+                } else {
+                    partes.push('na segunda');
+                }
+                
+                if (entidades.hora) partes.push(`às ${entidades.hora}`);
+                else partes.push('às 14h');
+                
+                mensagemAjuda += `"${partes.join(' ')}"`;
+            }
+            
             return {
                 success: false,
-                response: `📋 **Para agendar, preciso de mais informações:**\n\n${validacao.faltando.map((item, i) => `${i + 1}. ${item}`).join('\n')}\n\n💡 **Exemplo:** "Agendar revisão para o Gol do João na segunda às 14h"`,
+                response: mensagemAjuda,
                 tipo: 'pergunta',
                 faltando: validacao.faltando,
                 entidades_detectadas: entidades
