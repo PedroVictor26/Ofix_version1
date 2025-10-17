@@ -157,7 +157,8 @@ const AIPage = () => {
         let responseContent = '';
         let tipoResposta = 'agente'; // tipo padrão
         
-        if (data.success && data.response) {
+        // Verificar se há resposta (independente de success ser true ou false)
+        if (data.response) {
           if (typeof data.response === 'string') {
             responseContent = data.response;
           } else if (typeof data.response === 'object') {
@@ -174,9 +175,14 @@ const AIPage = () => {
           if (data.tipo) {
             tipoResposta = data.tipo; // confirmacao, pergunta, erro, ajuda, lista
           }
+        } else if (data.message) {
+          // Se não tem response, mas tem message
+          responseContent = data.message;
+          tipoResposta = data.success ? 'agente' : 'erro';
         } else {
-          responseContent = data.message || 'Resposta recebida do agente.';
-          tipoResposta = 'erro';
+          // Fallback se não tem nem response nem message
+          responseContent = 'Resposta recebida do agente.';
+          tipoResposta = 'agente';
         }
         
         const respostaAgente = {
