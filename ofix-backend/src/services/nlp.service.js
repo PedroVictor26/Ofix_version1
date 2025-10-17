@@ -148,21 +148,42 @@ export class NLPService {
         }
         
         // 5. EXTRAIR NOME DO CLIENTE
-        // Padrões melhorados: "do João", "da Maria", "para o João", "cliente João"
+        // Padrões melhorados: "do João", "da Maria", "para o João", "cliente João", "Nome: João"
         // IMPORTANTE: Ignorar se for um modelo de veículo
-        const padraoNome = /(?:do|da|para o|para a|cliente|sr\.?|sra\.?)\s+([A-ZÀÁÂÃÄÉÈÊËÍÏÓÔÕÖÚÙÛÜÇ][a-zàáâãäéèêëíïóôõöúùûüç]+(?:\s+[A-ZÀÁÂÃÄÉÈÊËÍÏÓÔÕÖÚÙÛÜÇ][a-zàáâãäéèêëíïóôõöúùûüç]+)*)/;
-        const matchNome = mensagem.match(padraoNome);
-        if (matchNome) {
-            const nomeExtraido = matchNome[1].trim();
-            // Verificar se não é um modelo de veículo
+        
+        // Tentar padrão explícito primeiro: "Nome: João" ou "Cliente: João"
+        const padraoExplicito = /(?:nome|cliente):\s*([A-ZÀ-Üa-zà-ü]+(?:\s+[A-ZÀ-Üa-zà-ü]+)*)/i;
+        const matchExplicito = mensagem.match(padraoExplicito);
+        
+        if (matchExplicito) {
+            const nomeExtraido = matchExplicito[1].trim();
             if (!modelosComuns.some(m => m.toLowerCase() === nomeExtraido.toLowerCase())) {
                 entidades.cliente = nomeExtraido;
+            }
+        } else {
+            // Tentar padrões contextuais: "do João", "da Maria", etc
+            const padraoNome = /(?:do|da|para o|para a|de|cliente)\s+([A-ZÀ-Üa-zà-ü]+(?:\s+[A-ZÀ-Üa-zà-ü]+)*?)(?:\s+na|\s+no|\s+às|\s+as|\s+em|\s+,|\s*$)/i;
+            const matchNome = mensagem.match(padraoNome);
+            
+            if (matchNome) {
+                const nomeExtraido = matchNome[1].trim();
+                // Verificar se não é um modelo de veículo
+                if (!modelosComuns.some(m => m.toLowerCase() === nomeExtraido.toLowerCase())) {
+                    entidades.cliente = nomeExtraido;
+                }
             }
         }
         
         // 6. EXTRAIR PLACA (formato: ABC-1234 ou ABC1234)
-        const padraoPlaca = /\b([A-Z]{3}-?\d{4})\b/i;
-        const matchPlaca = mensagem.match(padraoPlaca);
+        // Também aceitar formato "Placa: ABC-1234"
+        let padraoPlaca = /\b([A-Z]{3}-?\d{4})\b/i;
+        let matchPlaca = mensagem.match(padraoPlaca);
+        
+        // Se não encontrou, tentar formato explícito
+        if (!matchPlaca) {
+            padraoPlaca = /placa:\s*([A-Z]{3}-?\d{1,4})/i;
+            matchPlaca = mensagem.match(padraoPlaca);
+        }
         if (matchPlaca) {
             entidades.placa = matchPlaca[1].toUpperCase().replace('-', '');
             // Formatar com hífen
