@@ -387,11 +387,18 @@ export class NLPService {
     static extrairDadosCliente(mensagem) {
         const dados = {};
         
-        // Extrair nome
-        const padraoNome = /(?:nome|cliente):\s*([A-ZÀ-Üa-zà-ü\s]+?)(?:\s*,|\s*tel|\s*cpf|\s*$)/i;
-        const matchNome = mensagem.match(padraoNome);
-        if (matchNome) {
-            dados.nome = matchNome[1].trim();
+        // Extrair nome - FORMATO 1: "Nome: João Silva"
+        const padraoNomeFormatado = /(?:nome|cliente):\s*([A-ZÀ-Üa-zà-ü\s]+?)(?:\s*,|\s*tel|\s*cpf|\s*email|\s*$)/i;
+        const matchNomeFormatado = mensagem.match(padraoNomeFormatado);
+        if (matchNomeFormatado) {
+            dados.nome = matchNomeFormatado[1].trim();
+        } else {
+            // FORMATO 2: "cadastrar o João Silva" ou "novo cliente Maria Costa"
+            const padraoNomeComando = /(?:cadastrar|cadastro|cadastre|criar|adicionar|novo cliente|incluir|registrar)\s+(?:o|a|um|uma)?\s*([A-ZÀ-Üa-zà-ü][A-ZÀ-Üa-zà-ü\s]{2,}?)(?:\s*,|\s*tel|\s*cpf|\s*email|\s*na|\s*no|\s*para|\s*$)/i;
+            const matchNomeComando = mensagem.match(padraoNomeComando);
+            if (matchNomeComando) {
+                dados.nome = matchNomeComando[1].trim();
+            }
         }
         
         // Extrair telefone (vários formatos)
@@ -414,6 +421,8 @@ export class NLPService {
         if (matchEmail) {
             dados.email = matchEmail[1].trim();
         }
+        
+        console.log('📋 Dados extraídos do cliente:', dados);
         
         return dados;
     }
