@@ -813,8 +813,10 @@ async function processarCadastroCliente(mensagem, usuario_id) {
         
         console.log('   📋 Dados extraídos:', dados);
         
-        // Verificar se tem dados suficientes
+        // 🎯 SEMPRE ABRIR MODAL PARA REVISÃO E COMPLEMENTO
+        // Mesmo que tenha nome, pedir para revisar e adicionar telefone, CPF, email
         if (!dados.nome || dados.nome.length < 3) {
+            // Sem nome ou nome muito curto - pedir dados
             return {
                 success: false,
                 response: `📝 **Para cadastrar um novo cliente, preciso dos seguintes dados:**
@@ -830,7 +832,7 @@ async function processarCadastroCliente(mensagem, usuario_id) {
 **Ou informe apenas o nome para cadastro rápido:**
 "Cadastrar cliente João Silva"`,
                 tipo: 'cadastro',
-                dadosExtraidos: dados // 🎯 Retorna dados parciais extraídos
+                dadosExtraidos: dados
             };
         }
         
@@ -846,6 +848,7 @@ async function processarCadastroCliente(mensagem, usuario_id) {
         });
         
         if (clienteExistente) {
+            // Cliente existe - abrir modal com dados dele para edição
             return {
                 success: false,
                 response: `⚠️ **Cliente já cadastrado!**
@@ -854,7 +857,7 @@ async function processarCadastroCliente(mensagem, usuario_id) {
 **Telefone:** ${clienteExistente.telefone || 'Não informado'}
 **CPF/CNPJ:** ${clienteExistente.cpfCnpj || 'Não informado'}
 
-💡 Deseja fazer um agendamento para este cliente?`,
+💡 Clique no formulário para editar ou adicionar mais informações.`,
                 tipo: 'alerta',
                 cliente: clienteExistente,
                 dadosExtraidos: {
@@ -866,36 +869,25 @@ async function processarCadastroCliente(mensagem, usuario_id) {
             };
         }
         
-        // Criar novo cliente
-        const novoCliente = await prisma.cliente.create({
-            data: {
-                nomeCompleto: dados.nome,
-                telefone: dados.telefone || null,
-                cpfCnpj: dados.cpfCnpj || null,
-                email: dados.email || null,
-                oficinaId
-            }
-        });
-        
+        // 🎯 NÃO CADASTRAR DIRETO - SEMPRE ABRIR MODAL PARA REVISÃO
+        // Retorna os dados extraídos para pré-preencher o modal
+        // Usuário pode revisar e adicionar telefone, CPF, email antes de salvar
         return {
-            success: true,
-            response: `✅ **Cliente cadastrado com sucesso!**
+            success: false,
+            response: `📝 **Detectei os seguintes dados. Por favor, revise e complete no formulário:**
 
-**Nome:** ${novoCliente.nomeCompleto}
-${dados.telefone ? `**Telefone:** ${dados.telefone}` : ''}
-${dados.cpfCnpj ? `**CPF/CNPJ:** ${dados.cpfCnpj}` : ''}
-${dados.email ? `**Email:** ${dados.email}` : ''}
+**Nome:** ${dados.nome}
+${dados.telefone ? `**Telefone:** ${dados.telefone}` : '• Telefone (recomendado)'}
+${dados.cpfCnpj ? `**CPF/CNPJ:** ${dados.cpfCnpj}` : '• CPF/CNPJ (recomendado)'}
+${dados.email ? `**Email:** ${dados.email}` : '• Email (opcional)'}
 
-💡 **Próximos passos:**
-• Fazer agendamento para este cliente
-• Cadastrar veículo do cliente
-• Adicionar mais informações`,
-            tipo: 'sucesso',
-            cliente: novoCliente
+✅ Clique no formulário que abriu para revisar e salvar o cadastro.`,
+            tipo: 'cadastro',
+            dadosExtraidos: dados
         };
         
     } catch (error) {
-        console.error('❌ Erro ao cadastrar cliente:', error);
+        console.error('❌ Erro ao processar cadastro:', error);
         return {
             success: false,
             response: '❌ **Erro ao cadastrar cliente**\n\nPor favor, tente novamente ou cadastre manualmente na tela de clientes.',
