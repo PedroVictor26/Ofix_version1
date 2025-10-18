@@ -51,6 +51,7 @@ const AIPage = () => {
   // Estados para modal de cadastro de cliente
   const [modalClienteAberto, setModalClienteAberto] = useState(false);
   const [clientePrePreenchido, setClientePrePreenchido] = useState(null);
+  const [cadastroPendente, setCadastroPendente] = useState(false); // Indica se há um cadastro em andamento
   
   const chatContainerRef = useRef(null);
   const inputRef = useRef(null);
@@ -518,7 +519,10 @@ const AIPage = () => {
           tipo: tipoResposta, // Usar o tipo retornado pelo backend
           conteudo: responseContent,
           timestamp: new Date().toISOString(),
-          metadata: data.metadata || {}
+          metadata: {
+            ...data.metadata,
+            dadosExtraidos: data.dadosExtraidos // 🎯 Incluir dados extraídos para o botão
+          }
         };
 
         setConversas(prev => {
@@ -527,7 +531,7 @@ const AIPage = () => {
           return novasConversas;
         });
         
-        // 🎯 DETECTAR INTENÇÃO DE CADASTRO E ABRIR MODAL
+        // 🎯 DETECTAR INTENÇÃO DE CADASTRO E ABRIR MODAL AUTOMATICAMENTE
         // Abre modal quando: pede mais dados (cadastro) OU cliente já existe (alerta)
         if ((data.tipo === 'cadastro' || data.tipo === 'alerta') && data.dadosExtraidos) {
           // Pré-preencher modal com dados extraídos pelo NLP
@@ -540,6 +544,7 @@ const AIPage = () => {
           
           // Abrir modal para revisão/complementação dos dados
           setModalClienteAberto(true);
+          setCadastroPendente(true);
         }
         
         // Falar resposta automaticamente se voz estiver habilitada
@@ -893,12 +898,34 @@ const AIPage = () => {
                     ? 'bg-gradient-to-r from-red-50 to-orange-50 text-red-800 border border-red-200'
                     : conversa.tipo === 'pergunta'
                     ? 'bg-gradient-to-r from-yellow-50 to-amber-50 text-yellow-800 border border-yellow-200'
+                    : conversa.tipo === 'cadastro' || conversa.tipo === 'alerta'
+                    ? 'bg-gradient-to-r from-purple-50 to-indigo-50 text-purple-800 border border-purple-200'
                     : 'bg-slate-100 text-slate-900 border border-slate-200'
                 }`}
               >
                 <div className="whitespace-pre-wrap text-sm leading-relaxed">
                   {conversa.conteudo}
                 </div>
+                
+                {/* Botão para abrir modal em mensagens de cadastro */}
+                {(conversa.tipo === 'cadastro' || conversa.tipo === 'alerta') && conversa.metadata?.dadosExtraidos && (
+                  <Button
+                    onClick={() => {
+                      setClientePrePreenchido({
+                        nomeCompleto: conversa.metadata.dadosExtraidos.nome || '',
+                        telefone: conversa.metadata.dadosExtraidos.telefone || '',
+                        cpfCnpj: conversa.metadata.dadosExtraidos.cpfCnpj || '',
+                        email: conversa.metadata.dadosExtraidos.email || ''
+                      });
+                      setModalClienteAberto(true);
+                      setCadastroPendente(true);
+                    }}
+                    className="mt-3 w-full bg-gradient-to-r from-purple-500 to-indigo-500 hover:from-purple-600 hover:to-indigo-600 text-white rounded-lg py-2 px-4 text-sm font-medium transition-all duration-200 shadow-sm hover:shadow-md"
+                  >
+                    📝 Abrir Formulário de Cadastro
+                  </Button>
+                )}
+                
                 <div className={`text-xs mt-2 opacity-60 ${
                   conversa.tipo === 'usuario' ? 'text-white' : 'text-slate-500'
                 }`}>
@@ -1012,12 +1039,16 @@ const AIPage = () => {
       {/* 📝 MODAL DE CADASTRO DE CLIENTE */}
       <ClienteModal
         isOpen={modalClienteAberto}
-        onClose={() => setModalClienteAberto(false)}
+        onClose={() => {
+          setModalClienteAberto(false);
+          setCadastroPendente(false);
+        }}
         cliente={clientePrePreenchido}
         onSuccess={(clienteData) => {
-          // Fechar modal
+          // Fechar modal e limpar estados
           setModalClienteAberto(false);
           setClientePrePreenchido(null);
+          setCadastroPendente(false);
           
           // Adicionar mensagem de sucesso ao chat
           const mensagemSucesso = {
