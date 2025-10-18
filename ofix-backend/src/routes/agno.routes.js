@@ -755,11 +755,65 @@ async function processarEstatisticas(mensagem) {
 
 async function processarConsultaCliente(mensagem) {
     try {
-        // Implementar lógica de consulta de cliente
+        // Extrair nome, telefone ou cpf da mensagem
+        const padraoNome = /(?:nome|cliente|dados do cliente|consultar cliente|buscar cliente|telefone|cpf|cnpj):?\s*([A-ZÀ-Üa-zà-ü0-9\s-]+)/i;
+        let termoBusca = null;
+        const matchNome = mensagem.match(padraoNome);
+        if (matchNome) {
+            termoBusca = matchNome[1].trim();
+        } else {
+            // Se não veio formatado, tenta pegar a última palavra relevante
+            const palavras = mensagem.split(/\s+/);
+            termoBusca = palavras[palavras.length - 1];
+        }
+
+        if (!termoBusca || termoBusca.length < 2) {
+            return {
+                success: false,
+                response: '❌ Informe o nome, telefone ou CPF do cliente para consultar.',
+                tipo: 'erro'
+            };
+        }
+
+        // Buscar clientes por nome, telefone ou cpf
+        const clientes = await prisma.cliente.findMany({
+            where: {
+                OR: [
+                    { nomeCompleto: { contains: termoBusca, mode: 'insensitive' } },
+                    { telefone: { contains: termoBusca } },
+                    { cpfCnpj: { contains: termoBusca } }
+                ]
+            },
+            include: { veiculos: true }
+        });
+
+        if (clientes.length === 0) {
+            return {
+                success: false,
+                response: `❌ Nenhum cliente encontrado para "${termoBusca}".\n\nTente informar nome completo, telefone ou CPF.`,
+                tipo: 'erro'
+            };
+        }
+
+        // Montar resposta com lista de clientes
+        let resposta = `👤 **Clientes encontrados:**\n\n`;
+        clientes.forEach((c, idx) => {
+            resposta += `${idx + 1}. **${c.nomeCompleto}**\n`;
+            resposta += `   • Telefone: ${c.telefone || 'Não informado'}\n`;
+            resposta += `   • CPF/CNPJ: ${c.cpfCnpj || 'Não informado'}\n`;
+            if (c.veiculos && c.veiculos.length > 0) {
+                resposta += `   • Veículos: ${c.veiculos.map(v => v.modelo).join(', ')}\n`;
+            }
+            resposta += '\n';
+        });
+
+        resposta += `\n💡 Digite o número do cliente para selecionar ou "agendar" para iniciar um agendamento.`;
+
         return {
             success: true,
-            response: '👤 **Consulta de Clientes**\n\nFuncionalidade em desenvolvimento.',
-            tipo: 'info'
+            response: resposta,
+            tipo: 'consulta_cliente',
+            clientes: clientes
         };
     } catch (error) {
         return {

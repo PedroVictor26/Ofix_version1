@@ -1,27 +1,8 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { 
-  Brain, 
-  Send, 
-  User, 
-  Bot, 
-  Loader2, 
-  Settings, 
-  MessageCircle,
-  MessageSquare,
-  Zap,
-  AlertCircle,
-  CheckCircle,
-  Wrench,
-  Trash2,
-  Mic,
-  MicOff,
-  Volume2,
-  VolumeX
-} from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { useState, useRef, useEffect } from 'react';
+// import { User, Bot } from 'lucide-react';
+// import { Button } from '@/components/ui/button';
 import { useAuth } from '../context/AuthContext.jsx';
-import ClienteModal from '../components/clientes/ClienteModal';
+// import ClienteModal from '../components/clientes/ClienteModal';
 
 /**
  * Página dedicada para interação com o Assistente de IA (Agno Agent)
@@ -51,7 +32,7 @@ const AIPage = () => {
   // Estados para modal de cadastro de cliente
   const [modalClienteAberto, setModalClienteAberto] = useState(false);
   const [clientePrePreenchido, setClientePrePreenchido] = useState(null);
-  const [cadastroPendente, setCadastroPendente] = useState(false); // Indica se há um cadastro em andamento
+
   
   const chatContainerRef = useRef(null);
   const inputRef = useRef(null);
@@ -88,7 +69,7 @@ const AIPage = () => {
 
       try {
         const tokenDataString = localStorage.getItem('authToken');
-        let authHeaders = {
+  const authHeaders = {
           'Content-Type': 'application/json'
         };
         
@@ -116,11 +97,11 @@ const AIPage = () => {
               timestamp: msg.timestamp
             }));
             setConversas(mensagensFormatadas);
-            console.log('✅ Histórico carregado:', mensagensFormatadas.length, 'mensagens');
+            // console.log('✅ Histórico carregado:', mensagensFormatadas.length, 'mensagens');
           }
         }
-      } catch (error) {
-        console.error('❌ Erro ao carregar histórico:', error);
+  } catch {
+  // console.error('❌ Erro ao carregar histórico:', error);
       }
     };
 
@@ -154,7 +135,7 @@ const AIPage = () => {
       
       // Buscar token do localStorage usando o mesmo padrão do sistema OFIX
       const tokenDataString = localStorage.getItem('authToken');
-      let authHeaders = {
+  const authHeaders = {
         'Content-Type': 'application/json'
       };
       
@@ -164,8 +145,8 @@ const AIPage = () => {
           if (tokenData && tokenData.token) {
             authHeaders['Authorization'] = `Bearer ${tokenData.token}`;
           }
-        } catch (e) {
-          console.error('Erro ao processar token:', e);
+  } catch {
+          // console.error('Erro ao processar token:', e);
         }
       }
       
@@ -183,8 +164,8 @@ const AIPage = () => {
         setStatusConexao('erro');
         return false;
       }
-    } catch (error) {
-      console.error('Erro ao verificar conexão:', error);
+  } catch {
+  // console.error('Erro ao verificar conexão:', error);
       setStatusConexao('erro');
       return false;
     }
@@ -240,7 +221,7 @@ const AIPage = () => {
     };
 
     recognition.onerror = (event) => {
-      console.error('Erro reconhecimento:', event.error);
+  // console.error('Erro reconhecimento:', event.error);
       setGravando(false);
       
       // Não mostrar erro para aborted (normal quando para manualmente)
@@ -258,8 +239,8 @@ const AIPage = () => {
           if (recognitionRef.current && !falando) {
             try {
               recognitionRef.current.start();
-            } catch (e) {
-              console.error('Erro ao reiniciar reconhecimento:', e);
+            } catch {
+              // console.error('Erro ao reiniciar reconhecimento:', e);
             }
           }
         }, 300);
@@ -270,8 +251,8 @@ const AIPage = () => {
     
     try {
       recognition.start();
-    } catch (error) {
-      console.error('Erro ao iniciar reconhecimento:', error);
+  } catch {
+  // console.error('Erro ao iniciar reconhecimento:', error);
       setGravando(false);
     }
   };
@@ -280,8 +261,8 @@ const AIPage = () => {
     if (recognitionRef.current) {
       try {
         recognitionRef.current.stop();
-      } catch (e) {
-        console.error('Erro ao parar reconhecimento:', e);
+  } catch {
+  // console.error('Erro ao parar reconhecimento:', e);
       }
       recognitionRef.current = null;
     }
@@ -335,7 +316,7 @@ const AIPage = () => {
       if (recognitionRef.current) {
         try {
           recognitionRef.current.stop();
-        } catch (e) {
+  } catch {
           // Ignorar erro se já estiver parado
         }
       }
@@ -352,8 +333,8 @@ const AIPage = () => {
       }
     };
 
-    utterance.onerror = (event) => {
-      console.error('Erro na síntese de voz:', event);
+  utterance.onerror = () => {
+  // console.error('Erro na síntese de voz:', event);
       setFalando(false);
       
       // Reiniciar gravação se estava gravando
@@ -399,8 +380,8 @@ const AIPage = () => {
         userId: user?.id || 'anonymous'
       };
       localStorage.setItem(storageKey, JSON.stringify(dataToSave));
-    } catch (error) {
-      console.error('Erro ao salvar conversas:', error);
+  } catch {
+  // console.error('Erro ao salvar conversas:', error);
     }
   };
 
@@ -417,8 +398,8 @@ const AIPage = () => {
       };
       setConversas([mensagemInicial]);
       salvarConversasLocal([mensagemInicial]);
-    } catch (error) {
-      console.error('Erro ao limpar histórico:', error);
+  } catch {
+  // console.error('Erro ao limpar histórico:', error);
     }
   };
 
@@ -447,7 +428,7 @@ const AIPage = () => {
     try {
       // Buscar token do localStorage usando o mesmo padrão do sistema OFIX
       const tokenDataString = localStorage.getItem('authToken');
-      let authHeaders = {
+  const authHeaders = {
         'Content-Type': 'application/json'
       };
       
@@ -457,8 +438,8 @@ const AIPage = () => {
           if (tokenData && tokenData.token) {
             authHeaders['Authorization'] = `Bearer ${tokenData.token}`;
           }
-        } catch (e) {
-          console.error('Erro ao processar token:', e);
+  } catch {
+          // console.error('Erro ao processar token:', e);
         }
       }
       
@@ -544,7 +525,6 @@ const AIPage = () => {
           
           // Abrir modal para revisão/complementação dos dados
           setModalClienteAberto(true);
-          setCadastroPendente(true);
         }
         
         // Falar resposta automaticamente se voz estiver habilitada
@@ -557,7 +537,7 @@ const AIPage = () => {
             .replace(/`([^`]+)`/g, '$1') // Remove inline code
             .replace(/\n{2,}/g, '. ') // Converte quebras duplas em pausa
             .replace(/\n/g, ' ') // Converte quebras simples em espaço
-            .replace(/[•✅❌📋🔧🚗💼📊]/g, '') // Remove emojis
+            .replace(/[•✅❌📋🔧🚗💼📊]/gu, '') // Remove emojis
             .trim();
             
           if (textoLimpo.length > 0 && textoLimpo.length < 500) {
@@ -567,8 +547,8 @@ const AIPage = () => {
       } else {
         throw new Error(`Erro na API: ${response.status}`);
       }
-    } catch (error) {
-      console.error('Erro ao enviar mensagem:', error);
+  } catch {
+  // console.error('Erro ao enviar mensagem:', error);
       
       const mensagemErro = {
         id: Date.now() + 1,
@@ -855,6 +835,7 @@ const AIPage = () => {
           ref={chatContainerRef}
           className="flex-1 overflow-y-auto p-4 space-y-4"
         >
+
           {conversas.map((conversa) => (
             <div
               key={conversa.id}
@@ -871,6 +852,10 @@ const AIPage = () => {
                     ? 'bg-gradient-to-br from-red-500 to-orange-500'
                     : conversa.tipo === 'pergunta'
                     ? 'bg-gradient-to-br from-yellow-500 to-amber-500'
+                    : conversa.tipo === 'cadastro' || conversa.tipo === 'alerta'
+                    ? 'bg-gradient-to-br from-purple-500 to-indigo-500'
+                    : conversa.tipo === 'consulta_cliente'
+                    ? 'bg-gradient-to-br from-cyan-500 to-blue-400'
                     : 'bg-gradient-to-br from-blue-500 to-purple-500'
                 }`}>
                   {conversa.tipo === 'confirmacao' ? (
@@ -881,6 +866,8 @@ const AIPage = () => {
                     <MessageSquare className="w-4 h-4 text-white" />
                   ) : conversa.tipo === 'sistema' ? (
                     <Wrench className="w-4 h-4 text-white" />
+                  ) : conversa.tipo === 'consulta_cliente' ? (
+                    <User className="w-4 h-4 text-white" />
                   ) : (
                     <Bot className="w-4 h-4 text-white" />
                   )}
@@ -900,13 +887,14 @@ const AIPage = () => {
                     ? 'bg-gradient-to-r from-yellow-50 to-amber-50 text-yellow-800 border border-yellow-200'
                     : conversa.tipo === 'cadastro' || conversa.tipo === 'alerta'
                     ? 'bg-gradient-to-r from-purple-50 to-indigo-50 text-purple-800 border border-purple-200'
+                    : conversa.tipo === 'consulta_cliente'
+                    ? 'bg-gradient-to-r from-cyan-50 to-blue-50 text-cyan-900 border border-cyan-200'
                     : 'bg-slate-100 text-slate-900 border border-slate-200'
                 }`}
               >
                 <div className="whitespace-pre-wrap text-sm leading-relaxed">
                   {conversa.conteudo}
                 </div>
-                
                 {/* Botão para abrir modal em mensagens de cadastro */}
                 {(conversa.tipo === 'cadastro' || conversa.tipo === 'alerta') && conversa.metadata?.dadosExtraidos && (
                   <Button
@@ -918,14 +906,12 @@ const AIPage = () => {
                         email: conversa.metadata.dadosExtraidos.email || ''
                       });
                       setModalClienteAberto(true);
-                      setCadastroPendente(true);
                     }}
                     className="mt-3 w-full bg-gradient-to-r from-purple-500 to-indigo-500 hover:from-purple-600 hover:to-indigo-600 text-white rounded-lg py-2 px-4 text-sm font-medium transition-all duration-200 shadow-sm hover:shadow-md"
                   >
                     📝 Abrir Formulário de Cadastro
                   </Button>
                 )}
-                
                 <div className={`text-xs mt-2 opacity-60 ${
                   conversa.tipo === 'usuario' ? 'text-white' : 'text-slate-500'
                 }`}>
@@ -944,6 +930,21 @@ const AIPage = () => {
               )}
             </div>
           ))}
+        {/* Sugestões rápidas */}
+        <div className="flex flex-wrap gap-2 px-4 pb-2">
+          {['Consultar cliente', 'Agendar serviço', 'Ver OS', 'Consultar estoque'].map((sugestao) => (
+            <button
+              key={sugestao}
+              onClick={() => {
+                setMensagem(sugestao);
+                setTimeout(() => enviarMensagem(), 100);
+              }}
+              className="px-3 py-1.5 text-sm bg-cyan-50 text-cyan-700 rounded-full hover:bg-cyan-100 transition-colors border border-cyan-200"
+            >
+              {sugestao}
+            </button>
+          ))}
+        </div>
 
           {/* Indicador de carregamento */}
           {carregando && (
@@ -1041,14 +1042,14 @@ const AIPage = () => {
         isOpen={modalClienteAberto}
         onClose={() => {
           setModalClienteAberto(false);
-          setCadastroPendente(false);
+          // Removido setCadastroPendente
         }}
         cliente={clientePrePreenchido}
         onSuccess={(clienteData) => {
           // Fechar modal e limpar estados
           setModalClienteAberto(false);
           setClientePrePreenchido(null);
-          setCadastroPendente(false);
+          // Removido setCadastroPendente
           
           // Adicionar mensagem de sucesso ao chat
           const mensagemSucesso = {
