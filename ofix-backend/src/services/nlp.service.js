@@ -47,7 +47,7 @@ export class NLPService {
         
         // INTENÇÃO: CADASTRAR CLIENTE (verificar ANTES de consulta para não confundir)
         // Detecta tanto comandos explícitos quanto dados estruturados
-        const padraoCadastro = /\b(cadastr|novo cliente|adicionar cliente|criar cliente|incluir cliente|registrar cliente)\b/i;
+        const padraoCadastro = /\b(cadastrar|cadastro|cadastre|novo cliente|adicionar cliente|criar cliente|incluir cliente|registrar cliente|criar cadastro|fazer cadastro|quero cadastrar)\b/i;
         const formatoDados = /(?:nome|tel|telefone|cpf|cnpj|email):\s*[^,\n]+/i;
         
         console.log('🔍 DEBUG CADASTRO:');
