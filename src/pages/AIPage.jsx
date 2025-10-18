@@ -1,8 +1,9 @@
 import { useState, useRef, useEffect } from 'react';
-// import { User, Bot } from 'lucide-react';
-// import { Button } from '@/components/ui/button';
+import { User, Bot, CheckCircle, Loader2, AlertCircle, Volume2, VolumeX, Trash2, Settings, MessageSquare, Wrench, MicOff, Mic, Send, Brain } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { useAuth } from '../context/AuthContext.jsx';
-// import ClienteModal from '../components/clientes/ClienteModal';
+import ClienteModal from '../components/clientes/ClienteModal';
 
 /**
  * Página dedicada para interação com o Assistente de IA (Agno Agent)
