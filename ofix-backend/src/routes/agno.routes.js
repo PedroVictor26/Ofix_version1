@@ -22,7 +22,7 @@ const AGNO_CONTEXT = {
     description: "Assistente virtual Matias para oficina automotiva",
     capabilities: [
         "consultar_ordens_servico",
-        "agendar_servicos", 
+        "agendar_servicos",
         "consultar_pecas",
         "calcular_orcamentos",
         "listar_clientes",
@@ -39,7 +39,7 @@ const AGNO_CONTEXT = {
 router.get('/config', async (req, res) => {
     try {
         console.log('🔧 Verificando configuração do Agno...');
-        
+
         res.json({
             configured: !!AGNO_API_URL && AGNO_API_URL !== 'http://localhost:8000',
             agno_url: AGNO_API_URL,
@@ -61,7 +61,7 @@ router.get('/config', async (req, res) => {
 router.post('/chat-public', async (req, res) => {
     try {
         const { message } = req.body;
-        
+
         if (!message) {
             return res.status(400).json({ error: 'Mensagem é obrigatória' });
         }
@@ -84,7 +84,7 @@ router.post('/chat-public', async (req, res) => {
 
         // Testar conexão com Agno real
         console.log('🔌 Tentando conectar com Agno:', AGNO_API_URL);
-        
+
         const formData = new FormData();
         formData.append('message', message);
         formData.append('stream', 'false');
@@ -104,7 +104,7 @@ router.post('/chat-public', async (req, res) => {
             if (response.ok) {
                 const data = await response.json();
                 const responseText = data.content || data.response || data.message || 'Resposta do agente Matias';
-                
+
                 console.log('✅ Sucesso na comunicação com Agno');
                 res.json({
                     success: true,
@@ -118,11 +118,11 @@ router.post('/chat-public', async (req, res) => {
             }
         } catch (agnoError) {
             console.error('❌ Erro ao conectar com Agno:', agnoError.message);
-            
+
             // FALLBACK: Resposta inteligente baseada na mensagem
             let fallbackResponse;
             const msgLower = message.toLowerCase();
-            
+
             if (msgLower.includes('serviço') || msgLower.includes('problema') || msgLower.includes('carro')) {
                 fallbackResponse = `🔧 **Assistente OFIX**\n\nVocê mencionou: "${message}"\n\n**Posso ajudar com:**\n• Diagnóstico de problemas automotivos\n• Informações sobre serviços\n• Consulta de peças\n• Agendamento de manutenção\n\n*⚠️ Agente Matias temporariamente indisponível. Respondendo em modo local.*`;
             } else if (msgLower.includes('preço') || msgLower.includes('valor') || msgLower.includes('custo')) {
@@ -130,7 +130,7 @@ router.post('/chat-public', async (req, res) => {
             } else {
                 fallbackResponse = `🤖 **OFIX Assistant**\n\nOlá! Você disse: "${message}"\n\n**Como posso ajudar:**\n• Problemas no veículo\n• Informações sobre serviços\n• Consultas de peças\n• Agendamentos\n\n*🔄 Tentando reconectar com agente principal...*`;
             }
-            
+
             res.json({
                 success: true,
                 response: fallbackResponse,
@@ -155,90 +155,159 @@ router.post('/chat-public', async (req, res) => {
 
 router.post('/chat-inteligente', async (req, res) => {
     try {
-        const { message, usuario_id } = req.body;
-        
+        const { message, usuario_id, nlp, contextoNLP } = req.body;
+
         if (!message) {
-            return res.status(400).json({ 
+            return res.status(400).json({
                 success: false,
-                error: 'Mensagem é obrigatória' 
+                error: 'Mensagem é obrigatória'
             });
         }
 
         console.log('🎯 Chat Inteligente - Mensagem:', message.substring(0, 80) + '...');
-        
-        // 1. DETECTAR INTENÇÃO
-        const intencao = NLPService.detectarIntencao(message);
-        console.log('   Intenção detectada:', intencao);
-        
+
+        // 🧠 USAR NLP DO FRONTEND SE DISPONÍVEL
+        let intencao;
+        if (nlp && nlp.intencao) {
+            console.log('   ✅ Usando NLP do frontend:', nlp.intencao, `(${(nlp.confianca * 100).toFixed(1)}%)`);
+
+            // Mapear intenções do frontend para o backend
+            const mapeamento = {
+                'consulta_preco': 'CONSULTA_PRECO',
+                'agendamento': 'AGENDAMENTO',
+                'consulta_estoque': 'CONSULTA_ESTOQUE',
+                'consulta_cliente': 'CONSULTA_CLIENTE',
+                'consulta_os': 'CONSULTA_OS',
+                'saudacao': 'AJUDA',
+                'ajuda': 'AJUDA'
+            };
+
+            intencao = mapeamento[nlp.intencao] || NLPService.detectarIntencao(message);
+        } else {
+            // Fallback: usar NLP local
+            console.log('   ⚠️ NLP do frontend não disponível, usando NLP local');
+            intencao = NLPService.detectarIntencao(message);
+        }
+
+        console.log('   Intenção final:', intencao);
+
         // 2. PROCESSAR BASEADO NA INTENÇÃO
         let response;
-        
-        switch (intencao) {
-            case 'AGENDAMENTO':
-                response = await processarAgendamento(message, usuario_id);
-                break;
-                
-            case 'CONSULTA_OS':
-                response = await processarConsultaOS(message);
-                break;
-                
-            case 'CONSULTA_ESTOQUE':
-                response = await processarConsultaEstoque(message);
-                break;
-                
-            case 'ESTATISTICAS':
-                response = await processarEstatisticas(message);
-                break;
-                
-            case 'CONSULTA_CLIENTE':
-                response = await processarConsultaCliente(message);
-                break;
-                
-            case 'CADASTRAR_CLIENTE':
-                response = await processarCadastroCliente(message, usuario_id);
-                break;
-                
-            case 'AJUDA':
-                response = {
-                    success: true,
-                    response: NLPService.gerarMensagemAjuda(),
-                    tipo: 'ajuda'
-                };
-                break;
-                
-            default:
-                // Conversa geral - pode enviar para Agno Agent se configurado
-                response = await processarConversaGeral(message);
-                break;
-        }
-        
-        // 3. SALVAR CONVERSA NO HISTÓRICO
-        try {
-            if (usuario_id) {
-                await ConversasService.salvarConversa({
-                    usuarioId: usuario_id,
-                    pergunta: message,
-                    resposta: response.response || 'Sem resposta',
-                    contexto: JSON.stringify({ intencao, ...response.metadata }),
-                    timestamp: new Date()
-                });
+
+        // 🤖 Para consultas de preço e ajuda, tentar chamar Agno primeiro
+        if ((intencao === 'CONSULTA_PRECO' || intencao === 'AJUDA') && AGNO_API_URL && AGNO_API_URL !== 'http://localhost:8000') {
+            try {
+                console.log('   🤖 Chamando Agno AI para', intencao);
+                response = await chamarAgnoAI(message, usuario_id, intencao, nlp);
+            } catch (agnoError) {
+                console.error('   ⚠️ Agno falhou, usando fallback:', agnoError.message);
+                // Fallback para resposta local
+                if (intencao === 'CONSULTA_PRECO') {
+                    const servico = nlp?.entidades?.servico || 'serviço';
+                    response = {
+                        success: true,
+                        response: `💰 **Consulta de Preço - ${servico}**\n\nPara fornecer um orçamento preciso, preciso de algumas informações:\n\n• Qual é o modelo do veículo?\n• Qual ano?\n\nOs valores variam dependendo do veículo. Entre em contato para um orçamento personalizado!\n\n📞 **Contato:** (11) 1234-5678`,
+                        tipo: 'consulta_preco',
+                        mode: 'fallback',
+                        agno_error: agnoError.message,
+                        metadata: {
+                            servico: servico,
+                            intencao_detectada: 'consulta_preco'
+                        }
+                    };
+                } else {
+                    response = {
+                        success: true,
+                        response: NLPService.gerarMensagemAjuda(),
+                        tipo: 'ajuda',
+                        mode: 'fallback',
+                        agno_error: agnoError.message
+                    };
+                }
             }
-        } catch (saveError) {
-            console.error('⚠️ Erro ao salvar conversa (não crítico):', saveError.message);
+        } else {
+            // Processar localmente para outras intenções
+            switch (intencao) {
+                case 'CONSULTA_PRECO':
+                    const servico = nlp?.entidades?.servico || 'serviço';
+                    response = {
+                        success: true,
+                        response: `💰 **Consulta de Preço - ${servico}**\n\nPara fornecer um orçamento preciso, preciso de algumas informações:\n\n• Qual é o modelo do veículo?\n• Qual ano?\n\nOs valores variam dependendo do veículo. Entre em contato para um orçamento personalizado!\n\n📞 **Contato:** (11) 1234-5678`,
+                        tipo: 'consulta_preco',
+                        mode: 'local',
+                        agno_configured: false,
+                        metadata: {
+                            servico: servico,
+                            intencao_detectada: 'consulta_preco'
+                        }
+                    };
+                    break;
+
+                case 'AGENDAMENTO':
+                    response = await processarAgendamento(message, usuario_id);
+                    break;
+
+                case 'CONSULTA_OS':
+                    response = await processarConsultaOS(message);
+                    break;
+
+                case 'CONSULTA_ESTOQUE':
+                    response = await processarConsultaEstoque(message);
+                    break;
+
+                case 'ESTATISTICAS':
+                    response = await processarEstatisticas(message);
+                    break;
+
+                case 'CONSULTA_CLIENTE':
+                    response = await processarConsultaCliente(message);
+                    break;
+
+                case 'CADASTRAR_CLIENTE':
+                    response = await processarCadastroCliente(message, usuario_id);
+                    break;
+
+                case 'AJUDA':
+                    response = {
+                        success: true,
+                        response: NLPService.gerarMensagemAjuda(),
+                        tipo: 'ajuda'
+                    };
+                    break;
+
+                default:
+                    // Conversa geral - pode enviar para Agno Agent se configurado
+                    response = await processarConversaGeral(message);
+                    break;
+            }
+
+            // 3. SALVAR CONVERSA NO HISTÓRICO
+            try {
+                if (usuario_id) {
+                    await ConversasService.salvarConversa({
+                        usuarioId: usuario_id,
+                        pergunta: message,
+                        resposta: response.response || 'Sem resposta',
+                        contexto: JSON.stringify({ intencao, ...response.metadata }),
+                        timestamp: new Date()
+                    });
+                }
+            } catch (saveError) {
+                console.error('⚠️ Erro ao salvar conversa (não crítico):', saveError.message);
+            }
+
+            // 4. RETORNAR RESPOSTA
+            return res.json(response);
+
+        } catch (error) {
+            console.error('❌ Erro no chat inteligente:', error);
+            return res.status(500).json({
+                success: false,
+                error: 'Erro ao processar mensagem',
+                message: error.message
+            });
         }
-        
-        // 4. RETORNAR RESPOSTA
-        return res.json(response);
-        
-    } catch (error) {
-        console.error('❌ Erro no chat inteligente:', error);
-        return res.status(500).json({
-            success: false,
-            error: 'Erro ao processar mensagem',
-            message: error.message
-        });
-    }
-});
+    });
 
 // ============================================================
 // 📜 HISTÓRICO DE CONVERSAS
@@ -247,7 +316,7 @@ router.post('/chat-inteligente', async (req, res) => {
 router.get('/historico-conversa', async (req, res) => {
     try {
         const { usuario_id } = req.query;
-        
+
         if (!usuario_id) {
             return res.status(400).json({
                 success: false,
@@ -323,18 +392,18 @@ async function processarAgendamento(mensagem, usuario_id) {
             oficinaId = usuario?.oficinaId;
             console.log('   🏢 Oficina ID:', oficinaId);
         }
-        
+
         // 1. EXTRAIR ENTIDADES
         const entidades = NLPService.extrairEntidadesAgendamento(mensagem);
         console.log('   📋 Entidades:', JSON.stringify(entidades, null, 2));
-        
+
         // 2. VALIDAR DADOS NECESSÁRIOS
         const validacao = NLPService.validarDadosAgendamento(entidades);
-        
+
         if (!validacao.valido) {
             // Mensagem personalizada baseada no que está faltando
             let mensagemAjuda = '📋 **Vamos fazer seu agendamento!**\n\n';
-            
+
             if (validacao.faltando.length === 4 || validacao.faltando.length === 5) {
                 // Está faltando quase tudo - dar exemplo completo
                 mensagemAjuda += '💡 **Me informe os seguintes dados:**\n\n';
@@ -350,28 +419,28 @@ async function processarAgendamento(mensagem, usuario_id) {
                 mensagemAjuda += '**Informações que ainda preciso:**\n\n';
                 mensagemAjuda += validacao.faltando.map((item, i) => `${i + 1}. ${item}`).join('\n');
                 mensagemAjuda += '\n\n**Exemplo:**\n';
-                
+
                 // Gerar exemplo baseado no que já tem
                 const partes = [];
                 if (entidades.servico) partes.push(entidades.servico);
                 else partes.push('revisão');
-                
+
                 if (entidades.veiculo) partes.push(`para o ${entidades.veiculo}`);
                 else if (entidades.cliente) partes.push(`para o cliente ${entidades.cliente}`);
                 else partes.push('para o Gol do João');
-                
+
                 if (entidades.diaSemana || entidades.dataEspecifica) {
                     partes.push(entidades.diaTexto || new Date(entidades.dataEspecifica).toLocaleDateString('pt-BR'));
                 } else {
                     partes.push('na segunda');
                 }
-                
+
                 if (entidades.hora) partes.push(`às ${entidades.hora}`);
                 else partes.push('às 14h');
-                
+
                 mensagemAjuda += `"${partes.join(' ')}"`;
             }
-            
+
             return {
                 success: false,
                 response: mensagemAjuda,
@@ -380,11 +449,11 @@ async function processarAgendamento(mensagem, usuario_id) {
                 entidades_detectadas: entidades
             };
         }
-        
+
         // 3. BUSCAR CLIENTE NO BANCO (com busca inteligente)
         let cliente = null;
         let clientesSugeridos = [];
-        
+
         if (entidades.cliente) {
             // Busca exata primeiro (FILTRADO POR OFICINA)
             const whereClause = {
@@ -393,23 +462,23 @@ async function processarAgendamento(mensagem, usuario_id) {
                     mode: 'insensitive'
                 }
             };
-            
+
             // Adicionar filtro de oficina se disponível
             if (oficinaId) {
                 whereClause.oficinaId = oficinaId; // CAMPO É oficinaId (camelCase)
             }
-            
+
             cliente = await prisma.cliente.findFirst({
                 where: whereClause,
                 include: {
                     veiculos: true
                 }
             });
-            
+
             // Se não encontrou, buscar clientes similares para sugestão (FILTRADO POR OFICINA)
             if (!cliente) {
                 const palavrasBusca = entidades.cliente.split(' ').filter(p => p.length > 2);
-                
+
                 if (palavrasBusca.length > 0) {
                     const whereSugestoes = {
                         OR: palavrasBusca.map(palavra => ({
@@ -419,12 +488,12 @@ async function processarAgendamento(mensagem, usuario_id) {
                             }
                         }))
                     };
-                    
+
                     // Adicionar filtro de oficina
                     if (oficinaId) {
                         whereSugestoes.oficinaId = oficinaId; // CAMPO É oficinaId (camelCase)
                     }
-                    
+
                     clientesSugeridos = await prisma.cliente.findMany({
                         where: whereSugestoes,
                         include: {
@@ -449,7 +518,7 @@ async function processarAgendamento(mensagem, usuario_id) {
             });
             cliente = veiculo?.cliente;
         }
-        
+
         // Se não encontrou cliente, mostrar sugestões ou listar todos
         if (!cliente) {
             if (clientesSugeridos.length > 0) {
@@ -460,10 +529,10 @@ async function processarAgendamento(mensagem, usuario_id) {
                     sugestoes: clientesSugeridos
                 };
             }
-            
+
             // Se não tem sugestões, listar alguns clientes recentes (FILTRADO POR OFICINA)
             const whereClientesRecentes = oficinaId ? { oficinaId } : {};
-            
+
             const clientesRecentes = await prisma.cliente.findMany({
                 where: whereClientesRecentes,
                 include: {
@@ -474,10 +543,10 @@ async function processarAgendamento(mensagem, usuario_id) {
                 },
                 take: 5
             });
-            
+
             console.log('   📋 Clientes recentes encontrados:', clientesRecentes.length);
             console.log('   🏢 Filtrado por oficinaId:', oficinaId || 'SEM FILTRO');
-            
+
             if (clientesRecentes.length > 0) {
                 return {
                     success: false,
@@ -486,27 +555,27 @@ async function processarAgendamento(mensagem, usuario_id) {
                     clientes_disponiveis: clientesRecentes
                 };
             }
-            
+
             return {
                 success: false,
                 response: `❌ **Nenhum cliente cadastrado**\n\n${entidades.cliente ? `Não encontrei "${entidades.cliente}".` : ''}\n\n💡 **É necessário cadastrar o cliente primeiro:**\n1. Acesse "Clientes" no menu\n2. Clique em "Novo Cliente"\n3. Preencha os dados\n4. Depois volte aqui para agendar`,
                 tipo: 'erro'
             };
         }
-        
+
         // 4. BUSCAR VEÍCULO (com busca inteligente)
         let veiculo = null;
-        
+
         if (entidades.placa) {
             // Busca por placa (mais precisa)
             veiculo = cliente.veiculos.find(v => v.placa === entidades.placa);
         } else if (entidades.veiculo) {
             // Busca por modelo (pode ter múltiplos)
-            const veiculosEncontrados = cliente.veiculos.filter(v => 
+            const veiculosEncontrados = cliente.veiculos.filter(v =>
                 v.modelo.toLowerCase().includes(entidades.veiculo.toLowerCase()) ||
                 v.marca.toLowerCase().includes(entidades.veiculo.toLowerCase())
             );
-            
+
             if (veiculosEncontrados.length === 1) {
                 veiculo = veiculosEncontrados[0];
             } else if (veiculosEncontrados.length > 1) {
@@ -518,7 +587,7 @@ async function processarAgendamento(mensagem, usuario_id) {
                 };
             }
         }
-        
+
         // Se não encontrou e o cliente tem veículos, listar para escolha
         if (!veiculo && cliente.veiculos.length > 0) {
             // Se tem apenas 1 veículo, usar automaticamente
@@ -534,7 +603,7 @@ async function processarAgendamento(mensagem, usuario_id) {
                 };
             }
         }
-        
+
         if (!veiculo) {
             return {
                 success: false,
@@ -543,10 +612,10 @@ async function processarAgendamento(mensagem, usuario_id) {
                 cliente_id: cliente.id
             };
         }
-        
+
         // 5. CALCULAR DATA E HORA
         let dataAgendamento;
-        
+
         if (entidades.dataEspecifica) {
             dataAgendamento = entidades.dataEspecifica;
         } else if (entidades.diaSemana) {
@@ -558,9 +627,9 @@ async function processarAgendamento(mensagem, usuario_id) {
                 tipo: 'pergunta'
             };
         }
-        
+
         const dataHora = new Date(`${dataAgendamento}T${entidades.hora}:00`);
-        
+
         // Validar se a data não está no passado
         if (dataHora < new Date()) {
             return {
@@ -569,7 +638,7 @@ async function processarAgendamento(mensagem, usuario_id) {
                 tipo: 'erro'
             };
         }
-        
+
         // 6. VERIFICAR DISPONIBILIDADE
         const conflito = await prisma.agendamento.findFirst({
             where: {
@@ -582,7 +651,7 @@ async function processarAgendamento(mensagem, usuario_id) {
                 cliente: true
             }
         });
-        
+
         if (conflito) {
             return {
                 success: false,
@@ -591,7 +660,7 @@ async function processarAgendamento(mensagem, usuario_id) {
                 horarios_disponiveis: ['08:00', '10:00', '14:00', '16:00']
             };
         }
-        
+
         // 7. CRIAR AGENDAMENTO! ✅
         const agendamento = await AgendamentosService.criarAgendamento({
             clienteId: cliente.id,
@@ -601,10 +670,10 @@ async function processarAgendamento(mensagem, usuario_id) {
             descricao: `Agendamento via IA: ${mensagem}`,
             status: 'AGENDADO'
         });
-        
+
         // 8. CONFIRMAR COM DETALHES
         const dataFormatada = NLPService.formatarDataAmigavel(dataAgendamento);
-        
+
         return {
             success: true,
             response: `✅ **Agendamento Confirmado!**\n\n📋 **Protocolo:** #${agendamento.id}\n\n👤 **Cliente:** ${cliente.nomeCompleto}\n📞 **Telefone:** ${cliente.telefone || 'Não cadastrado'}\n\n🚗 **Veículo:** ${veiculo.marca} ${veiculo.modelo}\n🔖 **Placa:** ${veiculo.placa}${veiculo.cor ? `\n🎨 **Cor:** ${veiculo.cor}` : ''}\n\n📅 **Data:** ${dataFormatada}\n⏰ **Horário:** ${entidades.hora}\n🔧 **Serviço:** ${entidades.servico || 'Serviço Geral'}\n\n${entidades.urgente ? '🚨 **Urgente** - Priorizado\n\n' : ''}💬 ${cliente.nomeCompleto.split(' ')[0]} receberá confirmação por WhatsApp.`,
@@ -617,7 +686,7 @@ async function processarAgendamento(mensagem, usuario_id) {
                 hora: entidades.hora
             }
         };
-        
+
     } catch (error) {
         console.error('❌ Erro em processarAgendamento:', error);
         return {
@@ -636,19 +705,19 @@ async function processarConsultaOS(mensagem) {
     try {
         const dados = NLPService.extrairDadosConsultaOS(mensagem);
         console.log('   🔍 Dados para consulta OS:', dados);
-        
+
         const where = {};
-        
+
         if (dados.numeroOS) {
             where.id = dados.numeroOS;
         }
-        
+
         if (dados.placa) {
             where.veiculo = {
                 placa: dados.placa
             };
         }
-        
+
         if (dados.cliente) {
             where.cliente = {
                 nomeCompleto: {
@@ -657,11 +726,11 @@ async function processarConsultaOS(mensagem) {
                 }
             };
         }
-        
+
         if (dados.status) {
             where.status = dados.status;
         }
-        
+
         const ordensServico = await prisma.ordemServico.findMany({
             where,
             include: {
@@ -673,7 +742,7 @@ async function processarConsultaOS(mensagem) {
             },
             take: 10
         });
-        
+
         if (ordensServico.length === 0) {
             return {
                 success: false,
@@ -681,11 +750,11 @@ async function processarConsultaOS(mensagem) {
                 tipo: 'vazio'
             };
         }
-        
-        const lista = ordensServico.map((os, i) => 
+
+        const lista = ordensServico.map((os, i) =>
             `${i + 1}. **OS #${os.id}** - ${os.cliente.nomeCompleto}\n   🚗 ${os.veiculo.marca} ${os.veiculo.modelo} (${os.veiculo.placa})\n   📊 Status: ${os.status}\n   📅 Abertura: ${new Date(os.dataAbertura).toLocaleDateString('pt-BR')}`
         ).join('\n\n');
-        
+
         return {
             success: true,
             response: `🔍 **Ordens de Serviço Encontradas** (${ordensServico.length})\n\n${lista}`,
@@ -693,7 +762,7 @@ async function processarConsultaOS(mensagem) {
             total: ordensServico.length,
             ordensServico
         };
-        
+
     } catch (error) {
         console.error('❌ Erro em processarConsultaOS:', error);
         return {
@@ -732,7 +801,7 @@ async function processarConsultaEstoque(mensagem) {
 async function processarEstatisticas(mensagem) {
     try {
         const stats = await ConsultasOSService.obterResumoOfficina('hoje');
-        
+
         return {
             success: true,
             response: `📊 **Estatísticas de Hoje**\n\n• **Ordens de Serviço:** ${stats.total_os || 0}\n• **Agendamentos:** ${stats.agendamentos || 0}\n• **Clientes Atendidos:** ${stats.clientes || 0}\n• **Receita:** R$ ${(stats.receita || 0).toFixed(2)}`,
@@ -853,7 +922,7 @@ async function processarCadastroCliente(mensagem, usuario_id) {
             });
             oficinaId = usuario?.oficinaId;
         }
-        
+
         if (!oficinaId) {
             return {
                 success: false,
@@ -861,12 +930,12 @@ async function processarCadastroCliente(mensagem, usuario_id) {
                 tipo: 'erro'
             };
         }
-        
+
         // Extrair dados do cliente da mensagem
         const dados = NLPService.extrairDadosCliente(mensagem);
-        
+
         console.log('   📋 Dados extraídos:', dados);
-        
+
         // 🎯 SEMPRE ABRIR MODAL PARA REVISÃO E COMPLEMENTO
         // Mesmo que tenha nome, pedir para revisar e adicionar telefone, CPF, email
         if (!dados.nome || dados.nome.length < 3) {
@@ -889,7 +958,7 @@ async function processarCadastroCliente(mensagem, usuario_id) {
                 dadosExtraidos: dados
             };
         }
-        
+
         // Verificar se cliente já existe
         const clienteExistente = await prisma.cliente.findFirst({
             where: {
@@ -900,7 +969,7 @@ async function processarCadastroCliente(mensagem, usuario_id) {
                 oficinaId
             }
         });
-        
+
         if (clienteExistente) {
             // Cliente existe - abrir modal com dados dele para edição
             return {
@@ -922,7 +991,7 @@ async function processarCadastroCliente(mensagem, usuario_id) {
                 }
             };
         }
-        
+
         // 🎯 NÃO CADASTRAR DIRETO - SEMPRE ABRIR MODAL PARA REVISÃO
         // Retorna os dados extraídos para pré-preencher o modal
         // Usuário pode revisar e adicionar telefone, CPF, email antes de salvar
@@ -939,7 +1008,7 @@ ${dados.email ? `**Email:** ${dados.email}` : '• Email (opcional)'}
             tipo: 'cadastro',
             dadosExtraidos: dados
         };
-        
+
     } catch (error) {
         console.error('❌ Erro ao processar cadastro:', error);
         return {
@@ -958,23 +1027,23 @@ ${dados.email ? `**Email:** ${dados.email}` : '• Email (opcional)'}
 router.post('/consultar-os', async (req, res) => {
     try {
         const { veiculo, proprietario, status, periodo } = req.body;
-        
+
         console.log('🔍 Agno consultando OS:', { veiculo, proprietario, status, periodo });
-        
+
         const resultados = await ConsultasOSService.consultarOS({
             veiculo,
-            proprietario, 
+            proprietario,
             status,
             periodo
         });
-        
+
         res.json({
             success: true,
             total: resultados.length,
             ordens_servico: resultados,
             timestamp: new Date().toISOString()
         });
-        
+
     } catch (error) {
         console.error('❌ Erro na consulta OS:', error);
         res.status(500).json({
@@ -989,9 +1058,9 @@ router.post('/consultar-os', async (req, res) => {
 router.post('/agendar-servico', async (req, res) => {
     try {
         const { cliente, veiculo, servico, data_hora, descricao } = req.body;
-        
+
         console.log('📅 Agno agendando serviço:', { cliente, veiculo, servico, data_hora });
-        
+
         const agendamento = await AgendamentosService.criarAgendamento({
             clienteId: cliente.id,
             veiculoId: veiculo.id,
@@ -1000,14 +1069,14 @@ router.post('/agendar-servico', async (req, res) => {
             descricao,
             status: 'AGENDADO'
         });
-        
+
         res.json({
             success: true,
             agendamento,
             mensagem: `Serviço ${servico} agendado para ${new Date(data_hora).toLocaleString('pt-BR')}`,
             timestamp: new Date().toISOString()
         });
-        
+
     } catch (error) {
         console.error('❌ Erro no agendamento:', error);
         res.status(500).json({
@@ -1022,18 +1091,18 @@ router.post('/agendar-servico', async (req, res) => {
 router.get('/estatisticas', async (req, res) => {
     try {
         const { periodo = '30_dias' } = req.query;
-        
+
         console.log('📊 Agno consultando estatísticas:', { periodo });
-        
+
         const stats = await ConsultasOSService.obterEstatisticas(periodo);
-        
+
         res.json({
             success: true,
             periodo,
             estatisticas: stats,
             timestamp: new Date().toISOString()
         });
-        
+
     } catch (error) {
         console.error('❌ Erro nas estatísticas:', error);
         res.status(500).json({
@@ -1048,9 +1117,9 @@ router.get('/estatisticas', async (req, res) => {
 router.post('/salvar-conversa', async (req, res) => {
     try {
         const { usuario_id, mensagem, resposta, contexto } = req.body;
-        
+
         console.log('💾 Agno salvando conversa:', { usuario_id, mensagem: mensagem?.substring(0, 50) });
-        
+
         const conversa = await ConversasService.salvarConversa({
             usuarioId: usuario_id,
             pergunta: mensagem,
@@ -1058,13 +1127,13 @@ router.post('/salvar-conversa', async (req, res) => {
             contexto: JSON.stringify(contexto || {}),
             timestamp: new Date()
         });
-        
+
         res.json({
             success: true,
             conversa_id: conversa.id,
             timestamp: new Date().toISOString()
         });
-        
+
     } catch (error) {
         console.error('❌ Erro ao salvar conversa:', error);
         res.status(500).json({
@@ -1080,11 +1149,11 @@ router.get('/historico-conversas/:usuario_id', async (req, res) => {
     try {
         const { usuario_id } = req.params;
         const { limite = 10 } = req.query;
-        
+
         console.log('📚 Agno recuperando histórico:', { usuario_id, limite });
-        
+
         const historico = await ConversasService.obterHistorico(usuario_id, parseInt(limite));
-        
+
         res.json({
             success: true,
             usuario_id,
@@ -1092,7 +1161,7 @@ router.get('/historico-conversas/:usuario_id', async (req, res) => {
             conversas: historico,
             timestamp: new Date().toISOString()
         });
-        
+
     } catch (error) {
         console.error('❌ Erro no histórico:', error);
         res.status(500).json({
@@ -1112,7 +1181,7 @@ router.get('/contexto-sistema', async (req, res) => {
             assistente: "Matias",
             capacidades: [
                 "Consultar ordens de serviço por veículo, proprietário ou status",
-                "Agendar novos serviços com data e hora específicas", 
+                "Agendar novos serviços com data e hora específicas",
                 "Calcular orçamentos baseados em peças e mão de obra",
                 "Consultar histórico completo de veículos",
                 "Gerar relatórios de produtividade da oficina",
@@ -1121,7 +1190,7 @@ router.get('/contexto-sistema', async (req, res) => {
             ],
             funcoes_disponivel: {
                 "consultar_os": "/agno/consultar-os",
-                "agendar_servico": "/agno/agendar-servico", 
+                "agendar_servico": "/agno/agendar-servico",
                 "obter_estatisticas": "/agno/estatisticas",
                 "salvar_conversa": "/agno/salvar-conversa",
                 "historico": "/agno/historico-conversas/:usuario_id"
@@ -1133,12 +1202,12 @@ router.get('/contexto-sistema', async (req, res) => {
             },
             timestamp: new Date().toISOString()
         };
-        
+
         res.json({
             success: true,
             contexto
         });
-        
+
     } catch (error) {
         console.error('❌ Erro no contexto:', error);
         res.status(500).json({
@@ -1151,7 +1220,7 @@ router.get('/contexto-sistema', async (req, res) => {
 // Middleware para verificar autenticação
 const verificarAuth = (req, res, next) => {
     const token = req.headers.authorization?.replace('Bearer ', '');
-    
+
     if (!token) {
         return res.status(401).json({ error: 'Token de autenticação necessário' });
     }
@@ -1169,7 +1238,7 @@ const verificarAuth = (req, res, next) => {
 router.get('/health', verificarAuth, async (req, res) => {
     try {
         console.log('🔍 Verificando status do agente Agno...');
-        
+
         const response = await fetch(`${AGNO_API_URL}/health`, {
             method: 'GET',
             headers: {
@@ -1182,7 +1251,7 @@ router.get('/health', verificarAuth, async (req, res) => {
         if (response.ok) {
             const data = await response.json();
             console.log('✅ Agente Agno online:', data);
-            
+
             res.json({
                 status: 'online',
                 agno_status: data,
@@ -1210,7 +1279,7 @@ router.get('/health', verificarAuth, async (req, res) => {
 router.get('/agents', verificarAuth, async (req, res) => {
     try {
         console.log('📋 Listando agentes disponíveis...');
-        
+
         const response = await fetch(`${AGNO_API_URL}/agents`, {
             method: 'GET',
             headers: {
@@ -1222,7 +1291,7 @@ router.get('/agents', verificarAuth, async (req, res) => {
         if (response.ok) {
             const data = await response.json();
             console.log('📋 Agentes encontrados:', data.length);
-            
+
             res.json({
                 success: true,
                 agents: data,
@@ -1249,7 +1318,7 @@ router.get('/agents', verificarAuth, async (req, res) => {
 router.post('/chat', verificarAuth, async (req, res) => {
     try {
         const { message, agent_id, session_id } = req.body;
-        
+
         if (!message) {
             return res.status(400).json({ error: 'Mensagem é obrigatória' });
         }
@@ -1257,7 +1326,7 @@ router.post('/chat', verificarAuth, async (req, res) => {
         // Verificar se temos user_id válido
         const userId = req.user?.id || req.user?.userId || 'anonymous';
         const agentId = agent_id || 'oficinaia'; // Usar oficinaia por padrão, mas permitir override
-        
+
         console.log('💬 Enviando mensagem para agente Agno:', {
             user: req.user.email,
             user_id: userId,
@@ -1271,7 +1340,7 @@ router.post('/chat', verificarAuth, async (req, res) => {
         formData.append('message', message);
         formData.append('stream', 'false');
         formData.append('user_id', userId);
-        
+
         // Adicionar session_id para manter contexto (opcional)
         if (session_id) {
             formData.append('session_id', session_id);
@@ -1290,10 +1359,10 @@ router.post('/chat', verificarAuth, async (req, res) => {
         if (response.ok) {
             const data = await response.json();
             console.log('✅ Resposta recebida do agente Agno:', JSON.stringify(data, null, 2));
-            
+
             // Extrair o conteúdo da resposta de forma segura
             let responseText = '';
-            
+
             if (typeof data === 'string') {
                 responseText = data;
             } else if (data.content) {
@@ -1307,7 +1376,7 @@ router.post('/chat', verificarAuth, async (req, res) => {
             } else {
                 responseText = 'Resposta recebida do agente (formato não reconhecido)';
             }
-            
+
             res.json({
                 success: true,
                 response: responseText,
@@ -1324,12 +1393,12 @@ router.post('/chat', verificarAuth, async (req, res) => {
         } else {
             const errorData = await response.text();
             console.error('❌ Erro na resposta do agente Agno:', response.status, errorData);
-            
+
             let suggestion = null;
             if (response.status === 404) {
                 suggestion = 'Agente não encontrado. Use GET /api/agno/agents para listar agentes disponíveis.';
             }
-            
+
             res.status(response.status).json({
                 error: 'Erro no processamento da mensagem',
                 details: errorData,
@@ -1350,14 +1419,14 @@ router.post('/chat', verificarAuth, async (req, res) => {
 router.post('/chat-debug', verificarAuth, async (req, res) => {
     try {
         const { message, agent_id, session_id, custom_params } = req.body;
-        
+
         if (!message) {
             return res.status(400).json({ error: 'Mensagem é obrigatória' });
         }
 
         const userId = req.user?.id || req.user?.userId || 'anonymous';
         const agentId = agent_id || 'oficinaia';
-        
+
         console.log('🔍 Debug - Testando com parâmetros personalizados:', {
             user: req.user.email,
             agent_id: agentId,
@@ -1371,11 +1440,11 @@ router.post('/chat-debug', verificarAuth, async (req, res) => {
         formData.append('message', message);
         formData.append('stream', 'false');
         formData.append('user_id', userId);
-        
+
         if (session_id) {
             formData.append('session_id', session_id);
         }
-        
+
         // Adicionar parâmetros customizados se fornecidos
         if (custom_params) {
             Object.keys(custom_params).forEach(key => {
@@ -1396,7 +1465,7 @@ router.post('/chat-debug', verificarAuth, async (req, res) => {
         if (response.ok) {
             const data = await response.json();
             console.log('🔍 Debug - Resposta completa:', JSON.stringify(data, null, 2));
-            
+
             res.json({
                 success: true,
                 debug: true,
@@ -1431,13 +1500,13 @@ router.post('/chat-debug', verificarAuth, async (req, res) => {
 router.post('/chat-direct', verificarAuth, async (req, res) => {
     try {
         const { message, agent_id } = req.body;
-        
+
         if (!message) {
             return res.status(400).json({ error: 'Mensagem é obrigatória' });
         }
 
         const agentId = agent_id || 'oficinaia';
-        
+
         console.log('🎯 Teste direto - sem user_id específico:', {
             agent_id: agentId,
             message: message
@@ -1462,9 +1531,9 @@ router.post('/chat-direct', verificarAuth, async (req, res) => {
         if (response.ok) {
             const data = await response.json();
             console.log('🎯 Resposta do teste direto:', JSON.stringify(data, null, 2));
-            
+
             const responseText = data.content || data.response || data.message || 'Sem resposta';
-            
+
             res.json({
                 success: true,
                 response: responseText,
@@ -1500,10 +1569,10 @@ router.post('/chat-strict', verificarAuth, async (req, res) => {
     try {
         const { message, session_id } = req.body;
         const agentId = 'oficinaia';
-        
+
         console.log('🎯 Chat-strict iniciado - instruções rigorosas');
         console.log('📝 Mensagem original:', message);
-        
+
         // Instruções ULTRA RIGOROSAS para forçar uso de dados específicos
         const enhancedMessage = `INSTRUÇÕES CRÍTICAS - LEIA COM ATENÇÃO TOTAL:
 
@@ -1526,7 +1595,7 @@ LEMBRE-SE: DADOS ENCONTRADOS = RESPOSTA EXATA. NUNCA substitua dados específico
         formData.append('message', enhancedMessage);
         formData.append('stream', 'false');
         formData.append('user_id', req.user?.id || req.user?.userId || 'ofix_user');
-        
+
         if (session_id) {
             formData.append('session_id', session_id);
         }
@@ -1544,9 +1613,9 @@ LEMBRE-SE: DADOS ENCONTRADOS = RESPOSTA EXATA. NUNCA substitua dados específico
         if (response.ok) {
             const data = await response.json();
             console.log('🎯 Resposta chat-strict:', JSON.stringify(data, null, 2));
-            
+
             const responseText = data.content || data.response || data.message || 'Sem resposta';
-            
+
             res.json({
                 success: true,
                 response: responseText,
@@ -1578,5 +1647,60 @@ LEMBRE-SE: DADOS ENCONTRADOS = RESPOSTA EXATA. NUNCA substitua dados específico
         });
     }
 });
+
+// ============================================================
+// 🤖 FUNÇÃO AUXILIAR: CHAMAR AGNO AI
+// ============================================================
+
+async function chamarAgnoAI(message, usuario_id, intencao, nlp) {
+    console.log('   🔌 Conectando com Agno AI...');
+
+    // Preparar contexto rico para o Agno
+    const contexto = {
+        intencao: intencao,
+        entidades: nlp?.entidades || {},
+        confianca: nlp?.confianca || 0,
+        periodo: nlp?.periodo || null
+    };
+
+    const formData = new FormData();
+    formData.append('message', message);
+    formData.append('stream', 'false');
+    formData.append('user_id', usuario_id || 'anonymous');
+    formData.append('context', JSON.stringify(contexto));
+
+    const agnoResponse = await fetch(`${AGNO_API_URL}/agents/oficinaia/runs`, {
+        method: 'POST',
+        headers: {
+            ...formData.getHeaders(),
+            ...(AGNO_API_TOKEN && { 'Authorization': `Bearer ${AGNO_API_TOKEN}` })
+        },
+        body: formData,
+        timeout: 15000 // 15 segundos
+    });
+
+    if (!agnoResponse.ok) {
+        throw new Error(`Agno retornou status ${agnoResponse.status}`);
+    }
+
+    const agnoData = await agnoResponse.json();
+    const agnoContent = agnoData.content || agnoData.response || agnoData.message || 'Resposta do Agno';
+
+    console.log('   ✅ Resposta do Agno recebida');
+
+    return {
+        success: true,
+        response: agnoContent,
+        tipo: intencao.toLowerCase(),
+        mode: 'production',
+        agno_configured: true,
+        metadata: {
+            intencao_detectada: intencao,
+            agno_response: true,
+            entidades: nlp?.entidades,
+            ...agnoData
+        }
+    };
+}
 
 export default router;

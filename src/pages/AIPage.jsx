@@ -5,17 +5,30 @@ import { Input } from '@/components/ui/input';
 import { useAuth } from '../context/AuthContext.jsx';
 import ClienteModal from '../components/clientes/ClienteModal';
 
+// ✅ NOVOS IMPORTS - Melhorias Críticas
+import logger from '../utils/logger';
+import { validarMensagem } from '../utils/messageValidator';
+import { useToast } from '../components/ui/toast';
+import { useAuthHeaders } from '../hooks/useAuthHeaders';
+import { AI_CONFIG } from '../constants/aiPageConfig';
+import { enrichMessage } from '../utils/nlp/queryParser';
+
 /**
  * Página dedicada para interação com o Assistente de IA (Agno Agent)
  * Interface principal para comunicação com o agente inteligente
  */
 const AIPage = () => {
   const { user } = useAuth();
+
+  // ✅ NOVOS HOOKS - Melhorias Críticas
+  const { showToast } = useToast();
+  const { getAuthHeaders } = useAuthHeaders();
+
   const [mensagem, setMensagem] = useState('');
   const [conversas, setConversas] = useState([]);
   const [carregando, setCarregando] = useState(false);
   const [statusConexao, setStatusConexao] = useState('desconectado'); // conectado, conectando, desconectado, erro
-  
+
   // Estados para funcionalidades de voz
   const [gravando, setGravando] = useState(false);
   const [vozHabilitada, setVozHabilitada] = useState(true);
@@ -29,12 +42,12 @@ const AIPage = () => {
     pitch: 1.0, // Tom (0 a 2)
     volume: 1.0 // Volume (0 a 1)
   });
-  
+
   // Estados para modal de cadastro de cliente
   const [modalClienteAberto, setModalClienteAberto] = useState(false);
   const [clientePrePreenchido, setClientePrePreenchido] = useState(null);
 
-  
+
   const chatContainerRef = useRef(null);
   const inputRef = useRef(null);
   const recognitionRef = useRef(null);
@@ -46,7 +59,7 @@ const AIPage = () => {
       const vozes = window.speechSynthesis.getVoices();
       const vozesPortugues = vozes.filter(voz => voz.lang.startsWith('pt'));
       setVozesDisponiveis(vozesPortugues.length > 0 ? vozesPortugues : vozes);
-      
+
       // Selecionar primeira voz em português ou primeira voz disponível
       if (vozesPortugues.length > 0) {
         setVozSelecionada(vozesPortugues[0]);
@@ -56,7 +69,7 @@ const AIPage = () => {
     };
 
     carregarVozes();
-    
+
     // Algumas browsers carregam vozes assincronamente
     if (window.speechSynthesis.onvoiceschanged !== undefined) {
       window.speechSynthesis.onvoiceschanged = carregarVozes;
@@ -69,21 +82,12 @@ const AIPage = () => {
       if (!user?.id) return;
 
       try {
-        const tokenDataString = localStorage.getItem('authToken');
-  const authHeaders = {
-          'Content-Type': 'application/json'
-        };
-        
-        if (tokenDataString) {
-          const tokenData = JSON.parse(tokenDataString);
-          if (tokenData?.token) {
-            authHeaders['Authorization'] = `Bearer ${tokenData.token}`;
-          }
-        }
+        // ✅ USAR HOOK useAuthHeaders
+        const authHeaders = getAuthHeaders();
 
         const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:1000';
         const API_BASE = API_BASE_URL.replace('/api', '');
-        
+
         const response = await fetch(`${API_BASE}/agno/historico-conversa?usuario_id=${user.id}`, {
           headers: authHeaders
         });
@@ -98,16 +102,25 @@ const AIPage = () => {
               timestamp: msg.timestamp
             }));
             setConversas(mensagensFormatadas);
-            // console.log('✅ Histórico carregado:', mensagensFormatadas.length, 'mensagens');
+            logger.info('Histórico carregado', {
+              mensagensCount: mensagensFormatadas.length,
+              context: 'carregarHistorico'
+            });
           }
         }
-  } catch {
-  // console.error('❌ Erro ao carregar histórico:', error);
+      } catch (error) {
+        // ✅ LOGGING ESTRUTURADO
+        logger.error('Erro ao carregar histórico', {
+          error: error.message,
+          userId: user?.id,
+          context: 'carregarHistorico'
+        });
+        showToast('Erro ao carregar histórico', 'error');
       }
     };
 
     carregarHistorico();
-  }, [user?.id]);
+  }, [user?.id, getAuthHeaders, showToast]);
 
   // Mensagem inicial do sistema (se não houver histórico)
   useEffect(() => {
@@ -133,24 +146,10 @@ const AIPage = () => {
   const verificarConexao = async () => {
     try {
       setStatusConexao('conectando');
-      
-      // Buscar token do localStorage usando o mesmo padrão do sistema OFIX
-      const tokenDataString = localStorage.getItem('authToken');
-  const authHeaders = {
-        'Content-Type': 'application/json'
-      };
-      
-      if (tokenDataString) {
-        try {
-          const tokenData = JSON.parse(tokenDataString);
-          if (tokenData && tokenData.token) {
-            authHeaders['Authorization'] = `Bearer ${tokenData.token}`;
-          }
-  } catch {
-          // console.error('Erro ao processar token:', e);
-        }
-      }
-      
+
+      // ✅ USAR HOOK useAuthHeaders
+      const authHeaders = getAuthHeaders();
+
       // Testar o endpoint principal do Agno
       const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:1000';
       const response = await fetch(`${API_BASE}/agno/contexto-sistema`, {
@@ -165,9 +164,15 @@ const AIPage = () => {
         setStatusConexao('erro');
         return false;
       }
-  } catch {
-  // console.error('Erro ao verificar conexão:', error);
+    } catch (error) {
+      // ✅ LOGGING ESTRUTURADO
+      logger.error('Erro ao verificar conexão', {
+        error: error.message,
+        apiBase: import.meta.env.VITE_API_BASE_URL,
+        context: 'verificarConexao'
+      });
       setStatusConexao('erro');
+      showToast('Erro ao conectar com o agente', 'error');
       return false;
     }
   };
@@ -210,10 +215,10 @@ const AIPage = () => {
     recognition.onresult = (event) => {
       const transcript = event.results[event.results.length - 1][0].transcript;
       const confidence = event.results[event.results.length - 1][0].confidence;
-      
-      // Só aceitar transcrições com confiança mínima
-      if (confidence < 0.5) return;
-      
+
+      // ✅ USAR CONSTANTE
+      if (confidence < AI_CONFIG.VOICE.MIN_CONFIDENCE) return;
+
       if (modoContinuo) {
         setMensagem(prev => prev + (prev ? ' ' : '') + transcript);
       } else {
@@ -222,26 +227,34 @@ const AIPage = () => {
     };
 
     recognition.onerror = (event) => {
-  // console.error('Erro reconhecimento:', event.error);
+      // ✅ LOGGING ESTRUTURADO
+      logger.error('Erro no reconhecimento de voz', {
+        error: event.error,
+        message: event.message,
+        context: 'iniciarGravacao'
+      });
       setGravando(false);
-      
+
       // Não mostrar erro para aborted (normal quando para manualmente)
       if (event.error !== 'aborted' && event.error !== 'no-speech') {
-        alert(`Erro no reconhecimento de voz: ${event.error}`);
+        showToast(`Erro no reconhecimento de voz: ${event.error}`, 'error');
       }
     };
 
     recognition.onend = () => {
       setGravando(false);
-      
+
       // No modo contínuo, reinicia se não estiver falando
       if (modoContinuo && recognitionRef.current && !falando) {
         setTimeout(() => {
           if (recognitionRef.current && !falando) {
             try {
               recognitionRef.current.start();
-            } catch {
-              // console.error('Erro ao reiniciar reconhecimento:', e);
+            } catch (error) {
+              logger.warn('Erro ao reiniciar reconhecimento', {
+                error: error.message,
+                context: 'iniciarGravacao-restart'
+              });
             }
           }
         }, 300);
@@ -249,12 +262,17 @@ const AIPage = () => {
     };
 
     recognitionRef.current = recognition;
-    
+
     try {
       recognition.start();
-  } catch {
-  // console.error('Erro ao iniciar reconhecimento:', error);
+    } catch (error) {
+      // ✅ LOGGING ESTRUTURADO
+      logger.error('Erro ao iniciar reconhecimento', {
+        error: error.message,
+        context: 'iniciarGravacao'
+      });
       setGravando(false);
+      showToast('Erro ao iniciar gravação', 'error');
     }
   };
 
@@ -262,8 +280,11 @@ const AIPage = () => {
     if (recognitionRef.current) {
       try {
         recognitionRef.current.stop();
-  } catch {
-  // console.error('Erro ao parar reconhecimento:', e);
+      } catch (error) {
+        logger.warn('Erro ao parar reconhecimento', {
+          error: error.message,
+          context: 'pararGravacao'
+        });
       }
       recognitionRef.current = null;
     }
@@ -272,7 +293,19 @@ const AIPage = () => {
 
   // Função para síntese de fala
   const falarTexto = (texto) => {
-    if (!vozHabilitada || !('speechSynthesis' in window)) {
+    // Verificações de segurança
+    if (!vozHabilitada) {
+      logger.debug('Voz desabilitada, não falando');
+      return;
+    }
+
+    if (!('speechSynthesis' in window)) {
+      logger.warn('SpeechSynthesis não suportado neste navegador');
+      return;
+    }
+
+    if (!texto || texto.trim().length === 0) {
+      logger.debug('Texto vazio, não falando');
       return;
     }
 
@@ -283,7 +316,11 @@ const AIPage = () => {
     }
 
     // Cancelar qualquer fala anterior
-    window.speechSynthesis.cancel();
+    try {
+      window.speechSynthesis.cancel();
+    } catch (error) {
+      logger.error('Erro ao cancelar fala anterior', { error: error.message });
+    }
 
     // Limpar texto para melhor pronúncia
     const textoLimpo = texto
@@ -305,7 +342,7 @@ const AIPage = () => {
     utterance.rate = configVoz.rate;
     utterance.pitch = configVoz.pitch;
     utterance.volume = configVoz.volume;
-    
+
     // Usar voz selecionada se disponível
     if (vozSelecionada) {
       utterance.voice = vozSelecionada;
@@ -317,41 +354,65 @@ const AIPage = () => {
       if (recognitionRef.current) {
         try {
           recognitionRef.current.stop();
-  } catch {
-          // Ignorar erro se já estiver parado
+        } catch (error) {
+          // Ignorar erro se já estiver parado (esperado)
+          logger.debug('Reconhecimento já estava parado', {
+            error: error.message,
+            context: 'falarTexto-onstart'
+          });
         }
       }
     };
 
     utterance.onend = () => {
       setFalando(false);
-      
+
       // Reiniciar gravação se estava gravando antes
       if (estavagravando && modoContinuo) {
         setTimeout(() => {
           iniciarGravacao();
-        }, 500); // Delay de 500ms para evitar captar eco
+        }, AI_CONFIG.VOICE.ECHO_PREVENTION_DELAY_MS);
       }
     };
 
-  utterance.onerror = () => {
-  // console.error('Erro na síntese de voz:', event);
+    utterance.onerror = (event) => {
       setFalando(false);
-      
+
+      // Erros comuns que não são críticos
+      const errosComuns = ['canceled', 'interrupted', 'not-allowed'];
+      const ehErroComum = errosComuns.includes(event.error);
+
+      // ✅ LOGGING ESTRUTURADO - Nível apropriado
+      if (ehErroComum) {
+        logger.debug('Síntese de voz interrompida', {
+          error: event.error,
+          message: event.message,
+          context: 'falarTexto'
+        });
+      } else {
+        logger.error('Erro na síntese de voz', {
+          error: event.error,
+          message: event.message,
+          context: 'falarTexto'
+        });
+        // Só mostrar toast para erros críticos
+        showToast('Erro ao falar texto', 'error');
+      }
+
       // Reiniciar gravação se estava gravando
       if (estavagravando && modoContinuo) {
         setTimeout(() => {
           iniciarGravacao();
-        }, 500);
+        }, AI_CONFIG.VOICE.ECHO_PREVENTION_DELAY_MS);
       }
     };
 
     synthesisRef.current = utterance;
-    
+
     // Adicionar pequeno delay antes de falar para garantir que microfone parou
     setTimeout(() => {
       window.speechSynthesis.speak(utterance);
-    }, 200);
+    }, AI_CONFIG.VOICE.SPEAK_DELAY_MS);
   };
 
   const pararFala = () => {
@@ -381,8 +442,12 @@ const AIPage = () => {
         userId: user?.id || 'anonymous'
       };
       localStorage.setItem(storageKey, JSON.stringify(dataToSave));
-  } catch {
-  // console.error('Erro ao salvar conversas:', error);
+    } catch (error) {
+      logger.error('Erro ao salvar conversas', {
+        error: error.message,
+        conversasCount: novasConversas.length,
+        context: 'salvarConversasLocal'
+      });
     }
   };
 
@@ -390,7 +455,7 @@ const AIPage = () => {
     try {
       const storageKey = getStorageKey();
       localStorage.removeItem(storageKey);
-      
+
       const mensagemInicial = {
         id: Date.now(),
         tipo: 'sistema',
@@ -399,8 +464,12 @@ const AIPage = () => {
       };
       setConversas([mensagemInicial]);
       salvarConversasLocal([mensagemInicial]);
-  } catch {
-  // console.error('Erro ao limpar histórico:', error);
+    } catch (error) {
+      logger.error('Erro ao limpar histórico', {
+        error: error.message,
+        context: 'limparHistorico'
+      });
+      showToast('Erro ao limpar histórico', 'error');
     }
   };
 
@@ -411,10 +480,23 @@ const AIPage = () => {
   const enviarMensagem = async () => {
     if (!mensagem.trim() || carregando) return;
 
+    // ✅ VALIDAR MENSAGEM
+    const validacao = validarMensagem(mensagem);
+
+    if (!validacao.valid) {
+      showToast(validacao.errors[0], 'error');
+      logger.warn('Mensagem inválida', {
+        errors: validacao.errors,
+        messageLength: mensagem.length,
+        context: 'enviarMensagem'
+      });
+      return;
+    }
+
     const novaMensagem = {
       id: Date.now(),
       tipo: 'usuario',
-      conteudo: mensagem,
+      conteudo: validacao.sanitized, // ✅ USAR MENSAGEM SANITIZADA
       timestamp: new Date().toISOString()
     };
 
@@ -427,61 +509,106 @@ const AIPage = () => {
     setCarregando(true);
 
     try {
-      // Buscar token do localStorage usando o mesmo padrão do sistema OFIX
-      const tokenDataString = localStorage.getItem('authToken');
-  const authHeaders = {
-        'Content-Type': 'application/json'
-      };
-      
-      if (tokenDataString) {
-        try {
-          const tokenData = JSON.parse(tokenDataString);
-          if (tokenData && tokenData.token) {
-            authHeaders['Authorization'] = `Bearer ${tokenData.token}`;
-          }
-  } catch {
-          // console.error('Erro ao processar token:', e);
-        }
+      // ✅ USAR HOOK useAuthHeaders
+      const authHeaders = getAuthHeaders();
+
+      // 🧠 ENRIQUECER MENSAGEM COM NLP (opcional - não quebra se falhar)
+      let mensagemEnriquecida = null;
+      try {
+        mensagemEnriquecida = enrichMessage(novaMensagem.conteudo);
+        
+        logger.info('Mensagem enriquecida com NLP', {
+          intencao: mensagemEnriquecida.nlp.intencao,
+          confianca: mensagemEnriquecida.nlp.confianca,
+          entidades: Object.keys(mensagemEnriquecida.nlp.entidades),
+          context: 'enviarMensagem'
+        });
+      } catch (nlpError) {
+        logger.warn('Erro ao enriquecer mensagem com NLP', {
+          error: nlpError.message,
+          context: 'enviarMensagem'
+        });
       }
-      
+
       // 🤖 USAR NOVO ENDPOINT INTELIGENTE COM NLP
       // IMPORTANTE: A rota /agno está registrada FORA do prefixo /api no app.js
       const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:1000';
       const API_BASE = API_BASE_URL.replace('/api', ''); // Remove /api se existir
+      
+      // Preparar body da requisição (NLP é opcional)
+      const requestBody = {
+        message: novaMensagem.conteudo,
+        usuario_id: user?.id,
+        contexto_conversa: conversas.slice(-5).map(c => ({
+          tipo: c.tipo,
+          conteudo: c.conteudo
+        }))
+      };
+      
+      // Adicionar NLP apenas se foi processado com sucesso
+      if (mensagemEnriquecida) {
+        requestBody.nlp = mensagemEnriquecida.nlp;
+        requestBody.contextoNLP = mensagemEnriquecida.contexto;
+      }
+      
+      // 🔍 LOG: Requisição sendo enviada
+      logger.info('🚀 Enviando requisição ao backend', {
+        endpoint: `${API_BASE}/agno/chat-inteligente`,
+        hasNLP: !!mensagemEnriquecida,
+        intencao: mensagemEnriquecida?.nlp?.intencao,
+        message: novaMensagem.conteudo.substring(0, 50),
+        context: 'enviarMensagem'
+      });
+
       const response = await fetch(`${API_BASE}/agno/chat-inteligente`, {
         method: 'POST',
         headers: authHeaders,
-        body: JSON.stringify({
-          message: novaMensagem.conteudo,
-          usuario_id: user?.id,
-          contexto_conversa: conversas.slice(-5).map(c => ({
-            tipo: c.tipo,
-            conteudo: c.conteudo
-          }))
-        })
+        body: JSON.stringify(requestBody)
+      });
+
+      // 🔍 LOG: Resposta recebida
+      logger.info('📥 Resposta recebida do backend', {
+        status: response.status,
+        ok: response.ok,
+        statusText: response.statusText,
+        context: 'enviarMensagem'
       });
 
       if (response.ok) {
         const data = await response.json();
         
+        // 🔍 LOG: Dados da resposta
+        logger.info('📦 Dados da resposta', {
+          hasResponse: !!data.response,
+          hasMessage: !!data.message,
+          tipo: data.tipo,
+          mode: data.mode,
+          agno_configured: data.agno_configured,
+          agno_error: data.agno_error,
+          success: data.success,
+          responseType: typeof data.response,
+          responsePreview: typeof data.response === 'string' ? data.response.substring(0, 100) : 'object',
+          context: 'enviarMensagem'
+        });
+
         // Extrair o conteúdo da resposta de forma segura
         let responseContent = '';
         let tipoResposta = 'agente'; // tipo padrão
-        
+
         // Verificar se há resposta (independente de success ser true ou false)
         if (data.response) {
           if (typeof data.response === 'string') {
             responseContent = data.response;
           } else if (typeof data.response === 'object') {
             // Se a resposta é um objeto, tentar extrair o conteúdo
-            responseContent = data.response.content || 
-                             data.response.message || 
-                             data.response.output || 
-                             JSON.stringify(data.response, null, 2);
+            responseContent = data.response.content ||
+              data.response.message ||
+              data.response.output ||
+              JSON.stringify(data.response, null, 2);
           } else {
             responseContent = String(data.response);
           }
-          
+
           // Usar o tipo retornado pelo backend se disponível
           if (data.tipo) {
             tipoResposta = data.tipo; // confirmacao, pergunta, erro, ajuda, lista
@@ -495,7 +622,7 @@ const AIPage = () => {
           responseContent = 'Resposta recebida do agente.';
           tipoResposta = 'agente';
         }
-        
+
         const respostaAgente = {
           id: Date.now() + 1,
           tipo: tipoResposta, // Usar o tipo retornado pelo backend
@@ -512,7 +639,7 @@ const AIPage = () => {
           salvarConversasLocal(novasConversas); // Salvar no localStorage
           return novasConversas;
         });
-        
+
         // 🎯 DETECTAR INTENÇÃO DE CADASTRO E ABRIR MODAL AUTOMATICAMENTE
         // Abre modal quando: pede mais dados (cadastro) OU cliente já existe (alerta)
         if ((data.tipo === 'cadastro' || data.tipo === 'alerta') && data.dadosExtraidos) {
@@ -523,34 +650,50 @@ const AIPage = () => {
             cpfCnpj: data.dadosExtraidos.cpfCnpj || '',
             email: data.dadosExtraidos.email || ''
           });
-          
+
           // Abrir modal para revisão/complementação dos dados
           setModalClienteAberto(true);
         }
-        
+
         // Falar resposta automaticamente se voz estiver habilitada
-        if (vozHabilitada && responseContent) {
-          const textoLimpo = responseContent
-            .replace(/\*\*(.*?)\*\*/g, '$1') // Remove **bold**
-            .replace(/\*(.*?)\*/g, '$1') // Remove *italic*
-            .replace(/#{1,6}\s/g, '') // Remove headers #
-            .replace(/```[\s\S]*?```/g, '') // Remove code blocks
-            .replace(/`([^`]+)`/g, '$1') // Remove inline code
-            .replace(/\n{2,}/g, '. ') // Converte quebras duplas em pausa
-            .replace(/\n/g, ' ') // Converte quebras simples em espaço
-            .replace(/[•✅❌📋🔧🚗💼📊]/gu, '') // Remove emojis
-            .trim();
-            
-          if (textoLimpo.length > 0 && textoLimpo.length < 500) {
-            falarTexto(textoLimpo);
+        if (vozHabilitada && responseContent && 'speechSynthesis' in window) {
+          try {
+            const textoLimpo = responseContent
+              .replace(/\*\*(.*?)\*\*/g, '$1') // Remove **bold**
+              .replace(/\*(.*?)\*/g, '$1') // Remove *italic*
+              .replace(/#{1,6}\s/g, '') // Remove headers #
+              .replace(/```[\s\S]*?```/g, '') // Remove code blocks
+              .replace(/`([^`]+)`/g, '$1') // Remove inline code
+              .replace(/\n{2,}/g, '. ') // Converte quebras duplas em pausa
+              .replace(/\n/g, ' ') // Converte quebras simples em espaço
+              .replace(/[•✅❌📋🔧🚗💼📊]/gu, '') // Remove emojis
+              .trim();
+
+            // ✅ USAR CONSTANTE
+            if (textoLimpo.length > 0 && textoLimpo.length < AI_CONFIG.VOICE.MAX_TEXT_LENGTH_FOR_SPEECH) {
+              falarTexto(textoLimpo);
+            }
+          } catch (error) {
+            logger.error('Erro ao preparar texto para fala', {
+              error: error.message
+            });
           }
         }
       } else {
         throw new Error(`Erro na API: ${response.status}`);
       }
-  } catch {
-  // console.error('Erro ao enviar mensagem:', error);
-      
+    } catch (error) {
+      // ✅ LOGGING ESTRUTURADO
+      logger.error('Erro ao enviar mensagem', {
+        error: error.message,
+        stack: error.stack,
+        userId: user?.id,
+        messageLength: mensagem.length,
+        context: 'enviarMensagem'
+      });
+
+      showToast('Erro ao enviar mensagem. Tente novamente.', 'error');
+
       const mensagemErro = {
         id: Date.now() + 1,
         tipo: 'erro',
@@ -593,7 +736,7 @@ const AIPage = () => {
     };
 
     window.addEventListener('keydown', handleKeyDown);
-    
+
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
       if (recognitionRef.current) {
@@ -645,7 +788,7 @@ const AIPage = () => {
               <p className="text-sm text-slate-600">Powered by Agno AI Agent</p>
             </div>
           </div>
-          
+
           <div className="flex items-center gap-4">
             {/* Status da Conexão */}
             <div className="flex items-center gap-2 px-3 py-2 bg-slate-50 rounded-lg">
@@ -654,7 +797,7 @@ const AIPage = () => {
                 {getStatusText()}
               </span>
             </div>
-            
+
             {/* Botões de Ação */}
             <div className="flex items-center gap-2">
               <Button
@@ -666,7 +809,7 @@ const AIPage = () => {
               >
                 {vozHabilitada ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
               </Button>
-              
+
               {falando && (
                 <Button
                   variant="outline"
@@ -678,7 +821,7 @@ const AIPage = () => {
                   <VolumeX className="w-4 h-4" />
                 </Button>
               )}
-              
+
               <Button
                 variant="outline"
                 size="sm"
@@ -688,7 +831,7 @@ const AIPage = () => {
               >
                 <Trash2 className="w-4 h-4" />
               </Button>
-              
+
               <Button
                 variant="outline"
                 size="sm"
@@ -699,7 +842,7 @@ const AIPage = () => {
                 <Settings className="w-4 h-4" />
               </Button>
             </div>
-            
+
             {/* Botão de Reconectar */}
             <Button
               variant="outline"
@@ -719,7 +862,7 @@ const AIPage = () => {
       {mostrarConfig && (
         <div className="bg-white rounded-xl shadow-sm border border-slate-200/60 p-4 mb-4">
           <h3 className="text-sm font-semibold text-slate-900 mb-4">⚙️ Configurações de Voz</h3>
-          
+
           {/* Seletor de Voz */}
           <div className="mb-4">
             <label className="text-xs text-slate-600 mb-2 block font-medium">
@@ -753,14 +896,12 @@ const AIPage = () => {
             </div>
             <button
               onClick={() => setModoContinuo(!modoContinuo)}
-              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                modoContinuo ? 'bg-blue-600' : 'bg-gray-300'
-              }`}
+              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${modoContinuo ? 'bg-blue-600' : 'bg-gray-300'
+                }`}
             >
               <span
-                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                  modoContinuo ? 'translate-x-6' : 'translate-x-1'
-                }`}
+                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${modoContinuo ? 'translate-x-6' : 'translate-x-1'
+                  }`}
               />
             </button>
           </div>
@@ -777,11 +918,11 @@ const AIPage = () => {
                 max="2"
                 step="0.1"
                 value={configVoz.rate}
-                onChange={(e) => setConfigVoz({...configVoz, rate: parseFloat(e.target.value)})}
+                onChange={(e) => setConfigVoz({ ...configVoz, rate: parseFloat(e.target.value) })}
                 className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer"
               />
             </div>
-            
+
             {/* Tom */}
             <div>
               <label className="text-xs text-slate-600 mb-1 block">
@@ -793,11 +934,11 @@ const AIPage = () => {
                 max="2"
                 step="0.1"
                 value={configVoz.pitch}
-                onChange={(e) => setConfigVoz({...configVoz, pitch: parseFloat(e.target.value)})}
+                onChange={(e) => setConfigVoz({ ...configVoz, pitch: parseFloat(e.target.value) })}
                 className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer"
               />
             </div>
-            
+
             {/* Volume */}
             <div>
               <label className="text-xs text-slate-600 mb-1 block">
@@ -809,7 +950,7 @@ const AIPage = () => {
                 max="1"
                 step="0.1"
                 value={configVoz.volume}
-                onChange={(e) => setConfigVoz({...configVoz, volume: parseFloat(e.target.value)})}
+                onChange={(e) => setConfigVoz({ ...configVoz, volume: parseFloat(e.target.value) })}
                 className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer"
               />
             </div>
@@ -832,7 +973,7 @@ const AIPage = () => {
       {/* Área de Chat */}
       <div className="flex-1 bg-white rounded-xl shadow-sm border border-slate-200/60 flex flex-col overflow-hidden">
         {/* Container de Mensagens */}
-        <div 
+        <div
           ref={chatContainerRef}
           className="flex-1 overflow-y-auto p-4 space-y-4"
         >
@@ -840,25 +981,23 @@ const AIPage = () => {
           {conversas.map((conversa) => (
             <div
               key={conversa.id}
-              className={`flex gap-3 ${
-                conversa.tipo === 'usuario' ? 'justify-end' : 'justify-start'
-              }`}
+              className={`flex gap-3 ${conversa.tipo === 'usuario' ? 'justify-end' : 'justify-start'
+                }`}
             >
               {/* Avatar */}
               {conversa.tipo !== 'usuario' && (
-                <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
-                  conversa.tipo === 'confirmacao' || conversa.tipo === 'sistema'
-                    ? 'bg-gradient-to-br from-green-500 to-emerald-500'
-                    : conversa.tipo === 'erro'
+                <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${conversa.tipo === 'confirmacao' || conversa.tipo === 'sistema'
+                  ? 'bg-gradient-to-br from-green-500 to-emerald-500'
+                  : conversa.tipo === 'erro'
                     ? 'bg-gradient-to-br from-red-500 to-orange-500'
                     : conversa.tipo === 'pergunta'
-                    ? 'bg-gradient-to-br from-yellow-500 to-amber-500'
-                    : conversa.tipo === 'cadastro' || conversa.tipo === 'alerta'
-                    ? 'bg-gradient-to-br from-purple-500 to-indigo-500'
-                    : conversa.tipo === 'consulta_cliente'
-                    ? 'bg-gradient-to-br from-cyan-500 to-blue-400'
-                    : 'bg-gradient-to-br from-blue-500 to-purple-500'
-                }`}>
+                      ? 'bg-gradient-to-br from-yellow-500 to-amber-500'
+                      : conversa.tipo === 'cadastro' || conversa.tipo === 'alerta'
+                        ? 'bg-gradient-to-br from-purple-500 to-indigo-500'
+                        : conversa.tipo === 'consulta_cliente'
+                          ? 'bg-gradient-to-br from-cyan-500 to-blue-400'
+                          : 'bg-gradient-to-br from-blue-500 to-purple-500'
+                  }`}>
                   {conversa.tipo === 'confirmacao' ? (
                     <CheckCircle className="w-4 h-4 text-white" />
                   ) : conversa.tipo === 'erro' ? (
@@ -877,21 +1016,20 @@ const AIPage = () => {
 
               {/* Mensagem */}
               <div
-                className={`max-w-2xl rounded-2xl px-4 py-3 ${
-                  conversa.tipo === 'usuario'
-                    ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white'
-                    : conversa.tipo === 'confirmacao' || conversa.tipo === 'sistema'
+                className={`max-w-2xl rounded-2xl px-4 py-3 ${conversa.tipo === 'usuario'
+                  ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white'
+                  : conversa.tipo === 'confirmacao' || conversa.tipo === 'sistema'
                     ? 'bg-gradient-to-r from-green-50 to-emerald-50 text-green-800 border border-green-200'
                     : conversa.tipo === 'erro'
-                    ? 'bg-gradient-to-r from-red-50 to-orange-50 text-red-800 border border-red-200'
-                    : conversa.tipo === 'pergunta'
-                    ? 'bg-gradient-to-r from-yellow-50 to-amber-50 text-yellow-800 border border-yellow-200'
-                    : conversa.tipo === 'cadastro' || conversa.tipo === 'alerta'
-                    ? 'bg-gradient-to-r from-purple-50 to-indigo-50 text-purple-800 border border-purple-200'
-                    : conversa.tipo === 'consulta_cliente'
-                    ? 'bg-gradient-to-r from-cyan-50 to-blue-50 text-cyan-900 border border-cyan-200'
-                    : 'bg-slate-100 text-slate-900 border border-slate-200'
-                }`}
+                      ? 'bg-gradient-to-r from-red-50 to-orange-50 text-red-800 border border-red-200'
+                      : conversa.tipo === 'pergunta'
+                        ? 'bg-gradient-to-r from-yellow-50 to-amber-50 text-yellow-800 border border-yellow-200'
+                        : conversa.tipo === 'cadastro' || conversa.tipo === 'alerta'
+                          ? 'bg-gradient-to-r from-purple-50 to-indigo-50 text-purple-800 border border-purple-200'
+                          : conversa.tipo === 'consulta_cliente'
+                            ? 'bg-gradient-to-r from-cyan-50 to-blue-50 text-cyan-900 border border-cyan-200'
+                            : 'bg-slate-100 text-slate-900 border border-slate-200'
+                  }`}
               >
                 <div className="whitespace-pre-wrap text-sm leading-relaxed">
                   {conversa.conteudo}
@@ -913,9 +1051,8 @@ const AIPage = () => {
                     📝 Abrir Formulário de Cadastro
                   </Button>
                 )}
-                <div className={`text-xs mt-2 opacity-60 ${
-                  conversa.tipo === 'usuario' ? 'text-white' : 'text-slate-500'
-                }`}>
+                <div className={`text-xs mt-2 opacity-60 ${conversa.tipo === 'usuario' ? 'text-white' : 'text-slate-500'
+                  }`}>
                   {new Date(conversa.timestamp).toLocaleTimeString('pt-BR', {
                     hour: '2-digit',
                     minute: '2-digit'
@@ -931,21 +1068,21 @@ const AIPage = () => {
               )}
             </div>
           ))}
-        {/* Sugestões rápidas */}
-        <div className="flex flex-wrap gap-2 px-4 pb-2">
-          {['Consultar cliente', 'Agendar serviço', 'Ver OS', 'Consultar estoque'].map((sugestao) => (
-            <button
-              key={sugestao}
-              onClick={() => {
-                setMensagem(sugestao);
-                setTimeout(() => enviarMensagem(), 100);
-              }}
-              className="px-3 py-1.5 text-sm bg-cyan-50 text-cyan-700 rounded-full hover:bg-cyan-100 transition-colors border border-cyan-200"
-            >
-              {sugestao}
-            </button>
-          ))}
-        </div>
+          {/* Sugestões rápidas */}
+          <div className="flex flex-wrap gap-2 px-4 pb-2">
+            {['Consultar cliente', 'Agendar serviço', 'Ver OS', 'Consultar estoque'].map((sugestao) => (
+              <button
+                key={sugestao}
+                onClick={() => {
+                  setMensagem(sugestao);
+                  setTimeout(() => enviarMensagem(), 100);
+                }}
+                className="px-3 py-1.5 text-sm bg-cyan-50 text-cyan-700 rounded-full hover:bg-cyan-100 transition-colors border border-cyan-200"
+              >
+                {sugestao}
+              </button>
+            ))}
+          </div>
 
           {/* Indicador de carregamento */}
           {carregando && (
@@ -1002,8 +1139,12 @@ const AIPage = () => {
                 disabled={carregando || statusConexao !== 'conectado' || gravando}
                 className="resize-none border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 rounded-xl"
               />
+              {/* ✅ CONTADOR DE CARACTERES */}
+              <div className={`text-xs mt-1 ${mensagem.length > AI_CONFIG.CHAT.MAX_MESSAGE_LENGTH ? 'text-red-600' : 'text-slate-500'}`}>
+                {mensagem.length}/{AI_CONFIG.CHAT.MAX_MESSAGE_LENGTH} caracteres
+              </div>
             </div>
-            
+
             {/* Botão de gravação de voz */}
             <Button
               onClick={gravando ? pararGravacao : iniciarGravacao}
@@ -1015,7 +1156,7 @@ const AIPage = () => {
             >
               {gravando ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
             </Button>
-            
+
             <Button
               onClick={enviarMensagem}
               disabled={!mensagem.trim() || carregando || statusConexao !== 'conectado'}
@@ -1028,7 +1169,7 @@ const AIPage = () => {
               )}
             </Button>
           </div>
-          
+
           {statusConexao !== 'conectado' && (
             <div className="mt-2 text-xs text-amber-600 flex items-center gap-1">
               <AlertCircle className="w-3 h-3" />
@@ -1051,7 +1192,7 @@ const AIPage = () => {
           setModalClienteAberto(false);
           setClientePrePreenchido(null);
           // Removido setCadastroPendente
-          
+
           // Adicionar mensagem de sucesso ao chat
           const mensagemSucesso = {
             id: Date.now(),
@@ -1059,13 +1200,13 @@ const AIPage = () => {
             conteudo: `✅ Cliente **${clienteData.nomeCompleto}** cadastrado com sucesso! Posso ajudar em mais alguma coisa?`,
             timestamp: new Date().toISOString()
           };
-          
+
           setConversas(prev => {
             const novasConversas = [...prev, mensagemSucesso];
             salvarConversasLocal(novasConversas);
             return novasConversas;
           });
-          
+
           // Falar confirmação se voz habilitada
           if (vozHabilitada) {
             falarTexto(`Cliente ${clienteData.nomeCompleto} cadastrado com sucesso!`);
