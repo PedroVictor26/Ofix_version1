@@ -1,6 +1,5 @@
 import express from 'express';
 import fetch from 'node-fetch';
-import FormData from 'form-data';
 import jwt from 'jsonwebtoken';
 
 // Importar serviços do Matias
@@ -85,25 +84,23 @@ router.post('/chat-public', async (req, res) => {
         // Testar conexão com Agno real
         console.log('🔌 Tentando conectar com Agno:', AGNO_API_URL);
 
-        const formData = new FormData();
-        formData.append('message', message);
-        formData.append('stream', 'false');
-        formData.append('user_id', 'test_user');
-
         try {
-            const response = await fetch(`${AGNO_API_URL}/agents/oficinaia/runs`, {
+            const response = await fetch(`${AGNO_API_URL}/chat`, {
                 method: 'POST',
                 headers: {
-                    ...formData.getHeaders(),
+                    'Content-Type': 'application/json',
                     ...(AGNO_API_TOKEN && { 'Authorization': `Bearer ${AGNO_API_TOKEN}` })
                 },
-                body: formData,
+                body: JSON.stringify({
+                    message: message,
+                    user_id: 'test_user'
+                }),
                 timeout: 15000 // 15 segundos
             });
 
             if (response.ok) {
                 const data = await response.json();
-                const responseText = data.content || data.response || data.message || 'Resposta do agente Matias';
+                const responseText = data.response || data.content || data.message || 'Resposta do agente Matias';
 
                 console.log('✅ Sucesso na comunicação com Agno');
                 res.json({
@@ -1336,24 +1333,24 @@ router.post('/chat', verificarAuth, async (req, res) => {
             message: message.substring(0, 100) + '...'
         });
 
-        // Preparar FormData para multipart/form-data
-        const formData = new FormData();
-        formData.append('message', message);
-        formData.append('stream', 'false');
-        formData.append('user_id', userId);
+        // Preparar payload JSON
+        const payload = {
+            message: message,
+            user_id: userId
+        };
 
         // Adicionar session_id para manter contexto (opcional)
         if (session_id) {
-            formData.append('session_id', session_id);
+            payload.session_id = session_id;
         }
 
-        const response = await fetch(`${AGNO_API_URL}/agents/${agentId}/runs`, {
+        const response = await fetch(`${AGNO_API_URL}/chat`, {
             method: 'POST',
             headers: {
-                ...formData.getHeaders(),
+                'Content-Type': 'application/json',
                 ...(AGNO_API_TOKEN && { 'Authorization': `Bearer ${AGNO_API_TOKEN}` })
             },
-            body: formData,
+            body: JSON.stringify(payload),
             timeout: 30000 // 30 segundos timeout
         });
 
@@ -1436,30 +1433,28 @@ router.post('/chat-debug', verificarAuth, async (req, res) => {
             message: message
         });
 
-        // Preparar FormData com parâmetros customizáveis
-        const formData = new FormData();
-        formData.append('message', message);
-        formData.append('stream', 'false');
-        formData.append('user_id', userId);
+        // Preparar payload JSON com parâmetros customizáveis
+        const payload = {
+            message: message,
+            user_id: userId
+        };
 
         if (session_id) {
-            formData.append('session_id', session_id);
+            payload.session_id = session_id;
         }
 
         // Adicionar parâmetros customizados se fornecidos
         if (custom_params) {
-            Object.keys(custom_params).forEach(key => {
-                formData.append(key, custom_params[key]);
-            });
+            Object.assign(payload, custom_params);
         }
 
-        const response = await fetch(`${AGNO_API_URL}/agents/${agentId}/runs`, {
+        const response = await fetch(`${AGNO_API_URL}/chat`, {
             method: 'POST',
             headers: {
-                ...formData.getHeaders(),
+                'Content-Type': 'application/json',
                 ...(AGNO_API_TOKEN && { 'Authorization': `Bearer ${AGNO_API_TOKEN}` })
             },
-            body: formData,
+            body: JSON.stringify(payload),
             timeout: 30000
         });
 
@@ -1513,19 +1508,18 @@ router.post('/chat-direct', verificarAuth, async (req, res) => {
             message: message
         });
 
-        // FormData mais simples, sem user_id específico
-        const formData = new FormData();
-        formData.append('message', message);
-        formData.append('stream', 'false');
-        // Não enviar user_id específico para ver se melhora
+        // Payload JSON mais simples, sem user_id específico
+        const payload = {
+            message: message
+        };
 
-        const response = await fetch(`${AGNO_API_URL}/agents/${agentId}/runs`, {
+        const response = await fetch(`${AGNO_API_URL}/chat`, {
             method: 'POST',
             headers: {
-                ...formData.getHeaders(),
+                'Content-Type': 'application/json',
                 ...(AGNO_API_TOKEN && { 'Authorization': `Bearer ${AGNO_API_TOKEN}` })
             },
-            body: formData,
+            body: JSON.stringify(payload),
             timeout: 30000
         });
 
@@ -1592,22 +1586,22 @@ LEMBRE-SE: DADOS ENCONTRADOS = RESPOSTA EXATA. NUNCA substitua dados específico
 
         console.log('🔧 Mensagem com instruções rigorosas preparada');
 
-        const formData = new FormData();
-        formData.append('message', enhancedMessage);
-        formData.append('stream', 'false');
-        formData.append('user_id', req.user?.id || req.user?.userId || 'ofix_user');
+        const payload = {
+            message: enhancedMessage,
+            user_id: req.user?.id || req.user?.userId || 'ofix_user'
+        };
 
         if (session_id) {
-            formData.append('session_id', session_id);
+            payload.session_id = session_id;
         }
 
-        const response = await fetch(`${AGNO_API_URL}/agents/${agentId}/runs`, {
+        const response = await fetch(`${AGNO_API_URL}/chat`, {
             method: 'POST',
             headers: {
-                ...formData.getHeaders(),
+                'Content-Type': 'application/json',
                 ...(AGNO_API_TOKEN && { 'Authorization': `Bearer ${AGNO_API_TOKEN}` })
             },
-            body: formData,
+            body: JSON.stringify(payload),
             timeout: 30000
         });
 
@@ -1664,19 +1658,17 @@ async function chamarAgnoAI(message, usuario_id, intencao, nlp) {
         periodo: nlp?.periodo || null
     };
 
-    const formData = new FormData();
-    formData.append('message', message);
-    formData.append('stream', 'false');
-    formData.append('user_id', usuario_id || 'anonymous');
-    formData.append('context', JSON.stringify(contexto));
-
-    const agnoResponse = await fetch(`${AGNO_API_URL}/agents/oficinaia/runs`, {
+    const agnoResponse = await fetch(`${AGNO_API_URL}/chat`, {
         method: 'POST',
         headers: {
-            ...formData.getHeaders(),
+            'Content-Type': 'application/json',
             ...(AGNO_API_TOKEN && { 'Authorization': `Bearer ${AGNO_API_TOKEN}` })
         },
-        body: formData,
+        body: JSON.stringify({
+            message: message,
+            user_id: usuario_id || 'anonymous',
+            context: contexto
+        }),
         timeout: 15000 // 15 segundos
     });
 
@@ -1685,7 +1677,7 @@ async function chamarAgnoAI(message, usuario_id, intencao, nlp) {
     }
 
     const agnoData = await agnoResponse.json();
-    const agnoContent = agnoData.content || agnoData.response || agnoData.message || 'Resposta do Agno';
+    const agnoContent = agnoData.response || agnoData.content || agnoData.message || 'Resposta do Agno';
 
     console.log('   ✅ Resposta do Agno recebida');
 
