@@ -280,34 +280,35 @@ router.post('/chat-inteligente', async (req, res) => {
                     response = await processarConversaGeral(message);
                     break;
             }
-
-            // 3. SALVAR CONVERSA NO HISTÓRICO
-            try {
-                if (usuario_id) {
-                    await ConversasService.salvarConversa({
-                        usuarioId: usuario_id,
-                        pergunta: message,
-                        resposta: response.response || 'Sem resposta',
-                        contexto: JSON.stringify({ intencao, ...response.metadata }),
-                        timestamp: new Date()
-                    });
-                }
-            } catch (saveError) {
-                console.error('⚠️ Erro ao salvar conversa (não crítico):', saveError.message);
-            }
-
-            // 4. RETORNAR RESPOSTA
-            return res.json(response);
-
-        } catch (error) {
-            console.error('❌ Erro no chat inteligente:', error);
-            return res.status(500).json({
-                success: false,
-                error: 'Erro ao processar mensagem',
-                message: error.message
-            });
         }
-    });
+
+        // 3. SALVAR CONVERSA NO HISTÓRICO
+        try {
+            if (usuario_id) {
+                await ConversasService.salvarConversa({
+                    usuarioId: usuario_id,
+                    pergunta: message,
+                    resposta: response.response || 'Sem resposta',
+                    contexto: JSON.stringify({ intencao, ...response.metadata }),
+                    timestamp: new Date()
+                });
+            }
+        } catch (saveError) {
+            console.error('⚠️ Erro ao salvar conversa (não crítico):', saveError.message);
+        }
+
+        // 4. RETORNAR RESPOSTA
+        return res.json(response);
+
+    } catch (error) {
+        console.error('❌ Erro no chat inteligente:', error);
+        return res.status(500).json({
+            success: false,
+            error: 'Erro ao processar mensagem',
+            message: error.message
+        });
+    }
+});
 
 // ============================================================
 // 📜 HISTÓRICO DE CONVERSAS
