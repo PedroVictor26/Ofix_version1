@@ -1,9 +1,11 @@
 import { useState, useRef, useEffect } from 'react';
-import { User, Bot, CheckCircle, Loader2, AlertCircle, Volume2, VolumeX, Trash2, Settings, MessageSquare, Wrench, MicOff, Mic, Send, Brain } from 'lucide-react';
+import { User, Bot, CheckCircle, Loader2, AlertCircle, Volume2, VolumeX, Trash2, Settings, MessageSquare, Wrench, MicOff, Mic, Send } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useAuth } from '../context/AuthContext.jsx';
 import ClienteModal from '../components/clientes/ClienteModal';
+import ActionButtons from '../components/chat/ActionButtons';
+import SelectionOptions from '../components/chat/SelectionOptions';
 
 // ✅ NOVOS IMPORTS - Melhorias Críticas
 import logger from '../utils/logger';
@@ -24,10 +26,31 @@ const AIPage = () => {
   const { showToast } = useToast();
   const { getAuthHeaders } = useAuthHeaders();
 
+  // Adicionar estilos de animação
+  useEffect(() => {
+    const style = document.createElement('style');
+    style.textContent = `
+      @keyframes fade-in {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+      .animate-fade-in {
+        animation: fade-in 0.3s ease-out;
+      }
+    `;
+    document.head.appendChild(style);
+    return () => document.head.removeChild(style);
+  }, []);
+
   const [mensagem, setMensagem] = useState('');
   const [conversas, setConversas] = useState([]);
   const [carregando, setCarregando] = useState(false);
   const [statusConexao, setStatusConexao] = useState('desconectado'); // conectado, conectando, desconectado, erro
+
+  // ✅ NOVOS ESTADOS - Melhorias Críticas para Busca de Clientes
+  const [contextoAtivo, setContextoAtivo] = useState(null);
+  const [inputWarning, setInputWarning] = useState('');
+  const [inputHint, setInputHint] = useState('');
 
   // Estados para funcionalidades de voz
   const [gravando, setGravando] = useState(false);
@@ -474,6 +497,93 @@ const AIPage = () => {
   };
 
   // ============================================
+  // VALIDAÇÃO EM TEMPO REAL - Busca de Clientes
+  // ============================================
+  
+  const validarInputBusca = (valor) => {
+    if (!valor || contextoAtivo !== 'buscar_cliente') {
+      setInputWarning('');
+      setInputHint('');
+      return true;
+    }
+    
+    // Muito curto
+    if (valor.length < 3) {
+      setInputWarning('Digite pelo menos 3 caracteres');
+      setInputHint('');
+      return false;
+    }
+    
+    // Detectar e formatar CPF
+    const apenasNumeros = valor.replace(/\D/g, '');
+    if (apenasNumeros.length === 11 && !valor.includes('.')) {
+      const cpfFormatado = apenasNumeros.replace(
+        /(\d{3})(\d{3})(\d{3})(\d{2})/,
+        '$1.$2.$3-$4'
+      );
+      setMensagem(cpfFormatado);
+      setInputHint('✅ CPF detectado e formatado');
+      setInputWarning('');
+      return true;
+    }
+    
+    // Detectar telefone
+    if (apenasNumeros.length === 10 || apenasNumeros.length === 11) {
+      setInputHint('✅ Telefone detectado');
+      setInputWarning('');
+      return true;
+    }
+    
+    // Nome válido
+    if (valor.length >= 3) {
+      setInputHint('✅ Pronto para buscar');
+      setInputWarning('');
+      return true;
+    }
+    
+    setInputWarning('');
+    setInputHint('');
+    return true;
+  };
+
+  // ============================================
+  // HELPER: GERAR AÇÕES INLINE
+  // ============================================
+  
+  const gerarAcoesInline = (tipo, metadata) => {
+    const actions = [];
+    
+    // Consulta de cliente
+    if (tipo === 'consulta_cliente' && metadata?.cliente_id) {
+      actions.push(
+        { type: 'agendar', label: 'Agendar serviço', data: { cliente: metadata.cliente_nome } },
+        { type: 'ver_detalhes', label: 'Ver detalhes', data: { cliente_id: metadata.cliente_id } }
+      );
+      if (metadata.telefone) {
+        actions.push({ type: 'ligar', label: 'Ligar', data: { telefone: metadata.telefone } });
+      }
+    }
+    
+    // OS encontrada
+    if (metadata?.os_id) {
+      actions.push(
+        { type: 'ver_os', label: 'Ver OS', data: { os_id: metadata.os_id } },
+        { type: 'editar', label: 'Editar', data: { os_id: metadata.os_id } }
+      );
+    }
+    
+    // Agendamento criado
+    if (tipo === 'confirmacao' && metadata?.agendamento_id) {
+      actions.push(
+        { type: 'ver_detalhes', label: 'Ver agendamento', data: { agendamento_id: metadata.agendamento_id } },
+        { type: 'editar', label: 'Reagendar', data: { agendamento_id: metadata.agendamento_id } }
+      );
+    }
+    
+    return actions.length > 0 ? actions : null;
+  };
+
+  // ============================================
   // ENVIAR MENSAGEM
   // ============================================
 
@@ -496,8 +606,11 @@ const AIPage = () => {
     const novaMensagem = {
       id: Date.now(),
       tipo: 'usuario',
-      conteudo: validacao.sanitized, // ✅ USAR MENSAGEM SANITIZADA
-      timestamp: new Date().toISOString()
+      conteudo: validacao.sanitized,
+      timestamp: new Date().toISOString(),
+      metadata: {
+        contexto: contextoAtivo  // ✅ Adiciona contexto
+      }
     };
 
     setConversas(prev => {
@@ -505,14 +618,18 @@ const AIPage = () => {
       salvarConversasLocal(novasConversas);
       return novasConversas;
     });
+    
     setMensagem('');
     setCarregando(true);
+    
+    // Limpa hints
+    setInputWarning('');
+    setInputHint('');
 
     try {
-      // ✅ USAR HOOK useAuthHeaders
       const authHeaders = getAuthHeaders();
 
-      // 🧠 ENRIQUECER MENSAGEM COM NLP (opcional - não quebra se falhar)
+      // 🧠 ENRIQUECER MENSAGEM COM NLP
       let mensagemEnriquecida = null;
       try {
         mensagemEnriquecida = enrichMessage(novaMensagem.conteudo);
@@ -530,32 +647,30 @@ const AIPage = () => {
         });
       }
 
-      // 🤖 USAR NOVO ENDPOINT INTELIGENTE COM NLP
-      // IMPORTANTE: A rota /agno está registrada FORA do prefixo /api no app.js
       const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:1000';
-      const API_BASE = API_BASE_URL.replace('/api', ''); // Remove /api se existir
+      const API_BASE = API_BASE_URL.replace('/api', '');
       
-      // Preparar body da requisição (NLP é opcional)
+      // Preparar body da requisição
       const requestBody = {
         message: novaMensagem.conteudo,
         usuario_id: user?.id,
         contexto_conversa: conversas.slice(-5).map(c => ({
           tipo: c.tipo,
           conteudo: c.conteudo
-        }))
+        })),
+        contexto_ativo: contextoAtivo  // ✅ Envia contexto ativo
       };
       
-      // Adicionar NLP apenas se foi processado com sucesso
+      // Adicionar NLP se disponível
       if (mensagemEnriquecida) {
         requestBody.nlp = mensagemEnriquecida.nlp;
         requestBody.contextoNLP = mensagemEnriquecida.contexto;
       }
       
-      // 🔍 LOG: Requisição sendo enviada
       logger.info('🚀 Enviando requisição ao backend', {
         endpoint: `${API_BASE}/agno/chat-inteligente`,
         hasNLP: !!mensagemEnriquecida,
-        intencao: mensagemEnriquecida?.nlp?.intencao,
+        contextoAtivo: contextoAtivo,
         message: novaMensagem.conteudo.substring(0, 50),
         context: 'enviarMensagem'
       });
@@ -566,7 +681,6 @@ const AIPage = () => {
         body: JSON.stringify(requestBody)
       });
 
-      // 🔍 LOG: Resposta recebida
       logger.info('📥 Resposta recebida do backend', {
         status: response.status,
         ok: response.ok,
@@ -577,30 +691,20 @@ const AIPage = () => {
       if (response.ok) {
         const data = await response.json();
         
-        // 🔍 LOG: Dados da resposta
         logger.info('📦 Dados da resposta', {
           hasResponse: !!data.response,
-          hasMessage: !!data.message,
           tipo: data.tipo,
-          mode: data.mode,
-          agno_configured: data.agno_configured,
-          agno_error: data.agno_error,
           success: data.success,
-          responseType: typeof data.response,
-          responsePreview: typeof data.response === 'string' ? data.response.substring(0, 100) : 'object',
           context: 'enviarMensagem'
         });
 
-        // Extrair o conteúdo da resposta de forma segura
         let responseContent = '';
-        let tipoResposta = 'agente'; // tipo padrão
+        let tipoResposta = 'agente';
 
-        // Verificar se há resposta (independente de success ser true ou false)
         if (data.response) {
           if (typeof data.response === 'string') {
             responseContent = data.response;
           } else if (typeof data.response === 'object') {
-            // Se a resposta é um objeto, tentar extrair o conteúdo
             responseContent = data.response.content ||
               data.response.message ||
               data.response.output ||
@@ -609,67 +713,93 @@ const AIPage = () => {
             responseContent = String(data.response);
           }
 
-          // Usar o tipo retornado pelo backend se disponível
           if (data.tipo) {
-            tipoResposta = data.tipo; // confirmacao, pergunta, erro, ajuda, lista
+            tipoResposta = data.tipo;
           }
         } else if (data.message) {
-          // Se não tem response, mas tem message
           responseContent = data.message;
           tipoResposta = data.success ? 'agente' : 'erro';
         } else {
-          // Fallback se não tem nem response nem message
           responseContent = 'Resposta recebida do agente.';
           tipoResposta = 'agente';
         }
 
+        // ✅ TRATAMENTO ESPECIAL PARA ERRO DE BUSCA
+        if (contextoAtivo === 'buscar_cliente' && !data.success && data.tipo === 'erro') {
+          // Cliente não encontrado - oferecer cadastro
+          responseContent = `🔍 Não encontrei "${novaMensagem.conteudo}" no sistema.\n\n🆕 Quer cadastrar este cliente agora?\n\nVou precisar de:\n• Nome completo\n• Telefone\n• CPF (opcional)\n• Email (opcional)`;
+          tipoResposta = 'cadastro';
+          
+          data.metadata = {
+            ...data.metadata,
+            dadosExtraidos: {
+              nome: novaMensagem.conteudo
+            },
+            actions: [
+              { 
+                type: 'cadastrar_cliente', 
+                label: 'Sim, cadastrar', 
+                data: { nome: novaMensagem.conteudo } 
+              },
+              { 
+                type: 'tentar_novamente', 
+                label: 'Não, tentar outro nome', 
+                data: {} 
+              }
+            ]
+          };
+        }
+
+        const acoesInline = gerarAcoesInline(tipoResposta, data.metadata);
+        
         const respostaAgente = {
           id: Date.now() + 1,
-          tipo: tipoResposta, // Usar o tipo retornado pelo backend
+          tipo: tipoResposta,
           conteudo: responseContent,
           timestamp: new Date().toISOString(),
           metadata: {
             ...data.metadata,
-            dadosExtraidos: data.dadosExtraidos // 🎯 Incluir dados extraídos para o botão
+            dadosExtraidos: data.dadosExtraidos,
+            actions: acoesInline
           }
         };
 
         setConversas(prev => {
           const novasConversas = [...prev, respostaAgente];
-          salvarConversasLocal(novasConversas); // Salvar no localStorage
+          salvarConversasLocal(novasConversas);
           return novasConversas;
         });
 
-        // 🎯 DETECTAR INTENÇÃO DE CADASTRO E ABRIR MODAL AUTOMATICAMENTE
-        // Abre modal quando: pede mais dados (cadastro) OU cliente já existe (alerta)
-        if ((data.tipo === 'cadastro' || data.tipo === 'alerta') && data.dadosExtraidos) {
-          // Pré-preencher modal com dados extraídos pelo NLP
+        // 🎯 ABRIR MODAL DE CADASTRO SE NECESSÁRIO
+        if (tipoResposta === 'cadastro' && data.dadosExtraidos) {
           setClientePrePreenchido({
-            nomeCompleto: data.dadosExtraidos.nome || '',
+            nomeCompleto: data.dadosExtraidos.nome || novaMensagem.conteudo,
             telefone: data.dadosExtraidos.telefone || '',
             cpfCnpj: data.dadosExtraidos.cpfCnpj || '',
             email: data.dadosExtraidos.email || ''
           });
-
-          // Abrir modal para revisão/complementação dos dados
-          setModalClienteAberto(true);
+          // Não abre automaticamente, espera usuário clicar no botão
         }
 
-        // Falar resposta automaticamente se voz estiver habilitada
+        // ✅ LIMPAR CONTEXTO APÓS SUCESSO
+        if (data.success && contextoAtivo) {
+          setContextoAtivo(null);
+        }
+
+        // Falar resposta se voz habilitada
         if (vozHabilitada && responseContent && 'speechSynthesis' in window) {
           try {
             const textoLimpo = responseContent
-              .replace(/\*\*(.*?)\*\*/g, '$1') // Remove **bold**
-              .replace(/\*(.*?)\*/g, '$1') // Remove *italic*
-              .replace(/#{1,6}\s/g, '') // Remove headers #
-              .replace(/```[\s\S]*?```/g, '') // Remove code blocks
-              .replace(/`([^`]+)`/g, '$1') // Remove inline code
-              .replace(/\n{2,}/g, '. ') // Converte quebras duplas em pausa
-              .replace(/\n/g, ' ') // Converte quebras simples em espaço
-              .replace(/[•✅❌📋🔧🚗💼📊]/gu, '') // Remove emojis
+              .replace(/\*\*(.*?)\*\*/g, '$1')
+              .replace(/\*(.*?)\*/g, '$1')
+              .replace(/#{1,6}\s/g, '')
+              .replace(/```[\s\S]*?```/g, '')
+              .replace(/`([^`]+)`/g, '$1')
+              .replace(/\n{2,}/g, '. ')
+              .replace(/\n/g, ' ')
+              .replace(/[•✅❌📋🔧🚗💼📊🔍🆕👤📅💰📦]/gu, '')
               .trim();
 
-            // ✅ USAR CONSTANTE
             if (textoLimpo.length > 0 && textoLimpo.length < AI_CONFIG.VOICE.MAX_TEXT_LENGTH_FOR_SPEECH) {
               falarTexto(textoLimpo);
             }
@@ -683,12 +813,12 @@ const AIPage = () => {
         throw new Error(`Erro na API: ${response.status}`);
       }
     } catch (error) {
-      // ✅ LOGGING ESTRUTURADO
       logger.error('Erro ao enviar mensagem', {
         error: error.message,
         stack: error.stack,
         userId: user?.id,
         messageLength: mensagem.length,
+        contextoAtivo: contextoAtivo,
         context: 'enviarMensagem'
       });
 
@@ -790,10 +920,25 @@ const AIPage = () => {
           </div>
 
           <div className="flex items-center gap-4">
-            {/* Status da Conexão */}
-            <div className="flex items-center gap-2 px-3 py-2 bg-slate-50 rounded-lg">
-              {getStatusIcon()}
-              <span className="text-sm font-medium text-slate-700">
+            {/* Status da Conexão - Melhorado */}
+            <div className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-all duration-300 ${
+              statusConexao === 'conectado' ? 'bg-green-50 border border-green-200' :
+              statusConexao === 'conectando' ? 'bg-yellow-50 border border-yellow-200' :
+              statusConexao === 'erro' ? 'bg-red-50 border border-red-200' :
+              'bg-slate-50 border border-slate-200'
+            }`}>
+              <div className="relative">
+                {getStatusIcon()}
+                {statusConexao === 'conectado' && (
+                  <span className="absolute -top-1 -right-1 w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+                )}
+              </div>
+              <span className={`text-sm font-medium ${
+                statusConexao === 'conectado' ? 'text-green-700' :
+                statusConexao === 'conectando' ? 'text-yellow-700' :
+                statusConexao === 'erro' ? 'text-red-700' :
+                'text-slate-700'
+              }`}>
                 {getStatusText()}
               </span>
             </div>
@@ -1034,6 +1179,76 @@ const AIPage = () => {
                 <div className="whitespace-pre-wrap text-sm leading-relaxed">
                   {conversa.conteudo}
                 </div>
+                
+                {/* Botões de ação inline */}
+                {conversa.tipo !== 'usuario' && conversa.metadata?.actions && (
+                  <ActionButtons 
+                    actions={conversa.metadata.actions}
+                    onAction={(action) => {
+                      logger.info('Ação inline executada', { action });
+                      
+                      // Novo handler para tratar novas ações
+                      switch (action.type) {
+                        case 'cadastrar_cliente':
+                          // Abrir modal com dados pré-preenchidos
+                          setClientePrePreenchido({
+                            nomeCompleto: action.data.nome || '',
+                            telefone: action.data.telefone || '',
+                            cpfCnpj: action.data.cpfCnpj || '',
+                            email: action.data.email || ''
+                          });
+                          setModalClienteAberto(true);
+                          break;
+                          
+                        case 'tentar_novamente':
+                          // Limpar campo e manter contexto
+                          setMensagem('');
+                          if (inputRef.current) {
+                            inputRef.current.placeholder = 'Digite outro nome, CPF ou telefone...';
+                            inputRef.current.focus();
+                          }
+                          setContextoAtivo('buscar_cliente');
+                          break;
+                          
+                        case 'agendar':
+                          setMensagem(`Agendar serviço para ${action.data?.cliente || 'cliente'}`);
+                          break;
+                          
+                        case 'ver_os':
+                          // Navegar para OS ou abrir modal
+                          showToast(`Abrindo OS #${action.data?.os_id}`, 'info');
+                          break;
+                          
+                        case 'ligar':
+                          window.open(`tel:${action.data?.telefone}`, '_self');
+                          break;
+                          
+                        default:
+                          showToast(`Ação: ${action.label}`, 'info');
+                      }
+                    }}
+                  />
+                )}
+                
+                {/* Opções de seleção para ambiguidade */}
+                {conversa.tipo !== 'usuario' && conversa.metadata?.options && (
+                  <SelectionOptions
+                    options={conversa.metadata.options}
+                    title={conversa.metadata.selectionTitle || "Escolha uma opção:"}
+                    onSelect={(option) => {
+                      logger.info('Opção selecionada', { option });
+                      // Enviar mensagem com a seleção
+                      if (option.value) {
+                        setMensagem(option.value);
+                        setTimeout(() => enviarMensagem(), 100);
+                      } else if (option.id) {
+                        setMensagem(`Selecionado: ${option.label} (ID: ${option.id})`);
+                        setTimeout(() => enviarMensagem(), 100);
+                      }
+                    }}
+                  />
+                )}
+                
                 {/* Botão para abrir modal em mensagens de cadastro */}
                 {(conversa.tipo === 'cadastro' || conversa.tipo === 'alerta') && conversa.metadata?.dadosExtraidos && (
                   <Button
@@ -1070,30 +1285,108 @@ const AIPage = () => {
           ))}
           {/* Sugestões rápidas */}
           <div className="flex flex-wrap gap-2 px-4 pb-2">
-            {['Consultar cliente', 'Agendar serviço', 'Ver OS', 'Consultar estoque'].map((sugestao) => (
+            {[
+              { 
+                icon: '🔍',  // Mudou de 👤 para 🔍 (mais intuitivo)
+                text: 'Buscar cliente', 
+                command: 'buscar_cliente',  // Comando interno, não enviado
+                placeholder: 'Digite nome, CPF ou telefone...',
+                mensagemGuia: '👤 Claro! Me diga o nome, CPF ou telefone do cliente que você procura.\n\nExemplos:\n• João Silva\n• 123.456.789-00\n• (11) 98765-4321',
+                color: 'blue' 
+              },
+              { 
+                icon: '📅', 
+                text: 'Agendar serviço', 
+                command: 'agendar_servico',
+                placeholder: 'Ex: Troca de óleo para amanhã às 14h',
+                mensagemGuia: '📅 Vou te ajudar a agendar! Me diga:\n• Qual serviço?\n• Para quando?\n• Qual cliente?',
+                color: 'green' 
+              },
+              { 
+                icon: '🔧', 
+                text: 'Status da OS', 
+                command: 'status_os',
+                placeholder: 'Ex: OS 1234 ou cliente João Silva',
+                mensagemGuia: '🔧 Vou consultar o status! Me informe:\n• Número da OS, ou\n• Nome do cliente',
+                color: 'purple' 
+              },
+              { 
+                icon: '📦', 
+                text: 'Consultar peças', 
+                command: 'consultar_pecas',
+                placeholder: 'Ex: filtro de óleo ou código ABC123',
+                mensagemGuia: '📦 Vou buscar as peças! Me diga:\n• Nome da peça, ou\n• Código da peça',
+                color: 'orange' 
+              },
+              { 
+                icon: '💰', 
+                text: 'Calcular orçamento', 
+                command: 'calcular_orcamento',
+                placeholder: 'Ex: troca de óleo + filtro',
+                mensagemGuia: '💰 Vou calcular o orçamento! Me diga:\n• Quais serviços?\n• Quais peças?',
+                color: 'cyan' 
+              }
+            ].map((sugestao) => (
               <button
-                key={sugestao}
+                key={sugestao.text}
                 onClick={() => {
-                  setMensagem(sugestao);
-                  setTimeout(() => enviarMensagem(), 100);
+                  // NÃO envia mensagem automaticamente
+                  // Apenas prepara o contexto
+                  
+                  // Limpa o campo
+                  setMensagem("");
+                  
+                  // Atualiza placeholder
+                  if (inputRef.current) {
+                    inputRef.current.placeholder = sugestao.placeholder;
+                    inputRef.current.focus();
+                  }
+                  
+                  // Define contexto ativo
+                  setContextoAtivo(sugestao.command);
+                  
+                  // Envia mensagem guia do assistente
+                  const mensagemGuia = {
+                    id: Date.now(),
+                    tipo: 'sistema',
+                    conteudo: sugestao.mensagemGuia,
+                    timestamp: new Date().toISOString()
+                  };
+                  
+                  setConversas(prev => {
+                    const novasConversas = [...prev, mensagemGuia];
+                    salvarConversasLocal(novasConversas);
+                    return novasConversas;
+                  });
+                  
+                  logger.info('Contexto ativado', {
+                    contexto: sugestao.command,
+                    placeholder: sugestao.placeholder
+                  });
                 }}
-                className="px-3 py-1.5 text-sm bg-cyan-50 text-cyan-700 rounded-full hover:bg-cyan-100 transition-colors border border-cyan-200"
+                disabled={carregando}
+                className={`px-3 py-1.5 text-sm bg-${sugestao.color}-50 text-${sugestao.color}-700 rounded-full hover:bg-${sugestao.color}-100 transition-all duration-200 border border-${sugestao.color}-200 hover:shadow-md hover:scale-105 active:scale-95 flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100`}
               >
-                {sugestao}
+                <span>{sugestao.icon}</span>
+                <span>{sugestao.text}</span>
               </button>
             ))}
           </div>
 
-          {/* Indicador de carregamento */}
+          {/* Indicador de carregamento - Melhorado */}
           {carregando && (
-            <div className="flex gap-3 justify-start">
-              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center">
+            <div className="flex gap-3 justify-start animate-fade-in">
+              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center shadow-lg">
                 <Bot className="w-4 h-4 text-white" />
               </div>
-              <div className="bg-slate-100 border border-slate-200 rounded-2xl px-4 py-3">
-                <div className="flex items-center gap-2">
-                  <Loader2 className="w-4 h-4 animate-spin text-slate-600" />
-                  <span className="text-sm text-slate-600">Processando...</span>
+              <div className="bg-gradient-to-r from-slate-50 to-slate-100 border border-slate-200 rounded-2xl px-4 py-3 shadow-sm">
+                <div className="flex items-center gap-3">
+                  <div className="flex gap-1">
+                    <span className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{animationDelay: '0ms'}} />
+                    <span className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{animationDelay: '150ms'}} />
+                    <span className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{animationDelay: '300ms'}} />
+                  </div>
+                  <span className="text-sm text-slate-700 font-medium">Matias está pensando...</span>
                 </div>
               </div>
             </div>
@@ -1133,9 +1426,19 @@ const AIPage = () => {
               <Input
                 ref={inputRef}
                 value={mensagem}
-                onChange={(e) => setMensagem(e.target.value)}
+                onChange={(e) => {
+                  setMensagem(e.target.value);
+                  validarInputBusca(e.target.value);
+                }}
                 onKeyPress={handleKeyPress}
-                placeholder={gravando ? "🎤 Gravando..." : falando ? "Matias está falando..." : "Digite sua pergunta ou solicitação..."}
+                placeholder={gravando ? "🎤 Gravando..." : falando ? "Matias está falando..." : contextoAtivo ? 
+                  (contextoAtivo === 'buscar_cliente' ? 'Digite nome, CPF ou telefone...' : 
+                   contextoAtivo === 'agendar_servico' ? 'Ex: Troca de óleo para amanhã às 14h' :
+                   contextoAtivo === 'status_os' ? 'Ex: OS 1234 ou cliente João Silva' :
+                   contextoAtivo === 'consultar_pecas' ? 'Ex: filtro de óleo ou código ABC123' :
+                   contextoAtivo === 'calcular_orcamento' ? 'Ex: troca de óleo + filtro' :
+                   "Digite sua mensagem...") : 
+                  "Digite sua pergunta ou solicitação..."}
                 disabled={carregando || statusConexao !== 'conectado' || gravando}
                 className="resize-none border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 rounded-xl"
               />
@@ -1143,6 +1446,18 @@ const AIPage = () => {
               <div className={`text-xs mt-1 ${mensagem.length > AI_CONFIG.CHAT.MAX_MESSAGE_LENGTH ? 'text-red-600' : 'text-slate-500'}`}>
                 {mensagem.length}/{AI_CONFIG.CHAT.MAX_MESSAGE_LENGTH} caracteres
               </div>
+              
+              {/* Adicionar feedback visual abaixo do input */}
+              {inputWarning && (
+                <div className="px-4 py-1 text-xs text-red-600 bg-red-50 rounded">
+                  ⚠️ {inputWarning}
+                </div>
+              )}
+              {inputHint && (
+                <div className="px-4 py-1 text-xs text-green-600 bg-green-50 rounded">
+                  {inputHint}
+                </div>
+              )}
             </div>
 
             {/* Botão de gravação de voz */}

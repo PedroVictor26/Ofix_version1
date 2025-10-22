@@ -4,7 +4,7 @@
  * Este script testa os endpoints do backend após as correções
  */
 
-const BACKEND_URL = 'http://localhost:3001';
+const BACKEND_URL = 'https://ofix-backend-prod.onrender.com';
 
 async function testarChatPublico() {
     console.log('\n📋 1. TESTANDO /api/agno/chat-public');

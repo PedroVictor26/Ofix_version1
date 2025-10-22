@@ -152,7 +152,7 @@ router.post('/chat-public', async (req, res) => {
 
 router.post('/chat-inteligente', async (req, res) => {
     try {
-        const { message, usuario_id, nlp, contextoNLP } = req.body;
+        const { message, usuario_id, nlp, contextoNLP, contexto_ativo } = req.body;
 
         if (!message) {
             return res.status(400).json({
@@ -162,28 +162,76 @@ router.post('/chat-inteligente', async (req, res) => {
         }
 
         console.log('🎯 Chat Inteligente - Mensagem:', message.substring(0, 80) + '...');
+        console.log('🎯 Contexto ativo:', contexto_ativo);
 
-        // 🧠 USAR NLP DO FRONTEND SE DISPONÍVEL
+        // 🎯 USAR CONTEXTO ATIVO PARA SOBRESCREVER INTENÇÃO QUANDO APLICÁVEL
         let intencao;
-        if (nlp && nlp.intencao) {
-            console.log('   ✅ Usando NLP do frontend:', nlp.intencao, `(${(nlp.confianca * 100).toFixed(1)}%)`);
+        
+        // Se houver contexto ativo, priorizar isso sobre a detecção de intenções normais
+        if (contexto_ativo) {
+            console.log('   🎯 Usando contexto ativo:', contexto_ativo);
+            
+            switch (contexto_ativo) {
+                case 'buscar_cliente':
+                    intencao = 'CONSULTA_CLIENTE';  // Forçar tratamento como busca de cliente
+                    break;
+                case 'agendar_servico':
+                    intencao = 'AGENDAMENTO';
+                    break;
+                case 'status_os':
+                    intencao = 'CONSULTA_OS';
+                    break;
+                case 'consultar_pecas':
+                    intencao = 'CONSULTA_ESTOQUE';
+                    break;
+                case 'calcular_orcamento':
+                    intencao = 'CONSULTA_PRECO';
+                    break;
+                default:
+                    // Se não for um contexto conhecido, usar detecção normal
+                    if (nlp && nlp.intencao) {
+                        console.log('   ✅ Usando NLP do frontend:', nlp.intencao, `(${(nlp.confianca * 100).toFixed(1)}%)`);
+                        
+                        // Mapear intenções do frontend para o backend
+                        const mapeamento = {
+                            'consulta_preco': 'CONSULTA_PRECO',
+                            'agendamento': 'AGENDAMENTO',
+                            'consulta_estoque': 'CONSULTA_ESTOQUE',
+                            'consulta_cliente': 'CONSULTA_CLIENTE',
+                            'consulta_os': 'CONSULTA_OS',
+                            'saudacao': 'AJUDA',
+                            'ajuda': 'AJUDA'
+                        };
 
-            // Mapear intenções do frontend para o backend
-            const mapeamento = {
-                'consulta_preco': 'CONSULTA_PRECO',
-                'agendamento': 'AGENDAMENTO',
-                'consulta_estoque': 'CONSULTA_ESTOQUE',
-                'consulta_cliente': 'CONSULTA_CLIENTE',
-                'consulta_os': 'CONSULTA_OS',
-                'saudacao': 'AJUDA',
-                'ajuda': 'AJUDA'
-            };
-
-            intencao = mapeamento[nlp.intencao] || NLPService.detectarIntencao(message);
+                        intencao = mapeamento[nlp.intencao] || NLPService.detectarIntencao(message);
+                    } else {
+                        // Fallback: usar NLP local
+                        console.log('   ⚠️ NLP do frontend não disponível, usando NLP local');
+                        intencao = NLPService.detectarIntencao(message);
+                    }
+            }
         } else {
-            // Fallback: usar NLP local
-            console.log('   ⚠️ NLP do frontend não disponível, usando NLP local');
-            intencao = NLPService.detectarIntencao(message);
+            // Fallback: usar NLP normal quando não houver contexto ativo
+            if (nlp && nlp.intencao) {
+                console.log('   ✅ Usando NLP do frontend:', nlp.intencao, `(${(nlp.confianca * 100).toFixed(1)}%)`);
+                
+                // Mapear intenções do frontend para o backend
+                const mapeamento = {
+                    'consulta_preco': 'CONSULTA_PRECO',
+                    'agendamento': 'AGENDAMENTO',
+                    'consulta_estoque': 'CONSULTA_ESTOQUE',
+                    'consulta_cliente': 'CONSULTA_CLIENTE',
+                    'consulta_os': 'CONSULTA_OS',
+                    'saudacao': 'AJUDA',
+                    'ajuda': 'AJUDA'
+                };
+
+                intencao = mapeamento[nlp.intencao] || NLPService.detectarIntencao(message);
+            } else {
+                // Fallback: usar NLP local
+                console.log('   ⚠️ NLP do frontend não disponível, usando NLP local');
+                intencao = NLPService.detectarIntencao(message);
+            }
         }
 
         console.log('   Intenção final:', intencao);
@@ -286,7 +334,7 @@ router.post('/chat-inteligente', async (req, res) => {
                     usuarioId: usuario_id,
                     pergunta: message,
                     resposta: response.response || 'Sem resposta',
-                    contexto: JSON.stringify({ intencao, ...response.metadata }),
+                    contexto: JSON.stringify({ intencao, contexto_ativo, ...response.metadata }),
                     timestamp: new Date()
                 });
             }
@@ -520,11 +568,25 @@ async function processarAgendamento(mensagem, usuario_id) {
         // Se não encontrou cliente, mostrar sugestões ou listar todos
         if (!cliente) {
             if (clientesSugeridos.length > 0) {
+                // Formatar opções para seleção no frontend
+                const options = clientesSugeridos.map((c) => ({
+                    id: c.id,
+                    label: c.nomeCompleto,
+                    subtitle: c.telefone || 'Sem telefone',
+                    details: c.veiculos.length > 0 
+                        ? [`🚗 ${c.veiculos.map(v => `${v.marca} ${v.modelo}`).join(', ')}`]
+                        : ['Sem veículos cadastrados'],
+                    value: `Buscar cliente ${c.nomeCompleto}` // Mensagem que será enviada ao selecionar
+                }));
+
                 return {
                     success: false,
-                    response: `🔍 **Cliente "${entidades.cliente}" não encontrado**\n\n**Clientes similares encontrados:**\n${clientesSugeridos.map((c, i) => `${i + 1}. ${c.nomeCompleto}${c.telefone ? ` - ${c.telefone}` : ''}${c.veiculos.length > 0 ? `\n   🚗 ${c.veiculos.map(v => `${v.marca} ${v.modelo}`).join(', ')}` : ''}`).join('\n\n')}\n\n💡 **Digite o número ou nome completo do cliente correto**`,
-                    tipo: 'sugestao',
-                    sugestoes: clientesSugeridos
+                    response: `🔍 **Encontrei ${clientesSugeridos.length} clientes com nome similar a "${entidades.cliente}"**\n\nEscolha o cliente correto abaixo:`,
+                    tipo: 'multiplos',
+                    metadata: {
+                        options: options,
+                        selectionTitle: 'Clientes encontrados:'
+                    }
                 };
             }
 
@@ -577,11 +639,23 @@ async function processarAgendamento(mensagem, usuario_id) {
             if (veiculosEncontrados.length === 1) {
                 veiculo = veiculosEncontrados[0];
             } else if (veiculosEncontrados.length > 1) {
+                // Formatar opções para seleção no frontend
+                const options = veiculosEncontrados.map((v) => ({
+                    id: v.id,
+                    label: `${v.marca} ${v.modelo} ${v.anoModelo || ''}`,
+                    subtitle: `Placa: ${v.placa}`,
+                    details: v.cor ? [`Cor: ${v.cor}`] : [],
+                    value: `Agendar para o veículo ${v.placa}` // Mensagem que será enviada
+                }));
+
                 return {
                     success: false,
-                    response: `🚗 **Múltiplos veículos "${entidades.veiculo}" encontrados**\n\n**Cliente:** ${cliente.nomeCompleto}\n\n**Escolha o veículo:**\n${veiculosEncontrados.map((v, i) => `${i + 1}. ${v.marca} ${v.modelo} ${v.anoModelo || ''} - ${v.placa}${v.cor ? ` (${v.cor})` : ''}`).join('\n')}\n\n💡 Digite o número ou especifique a placa (ex: "ABC-1234")`,
+                    response: `🚗 **Encontrei ${veiculosEncontrados.length} veículos "${entidades.veiculo}" para ${cliente.nomeCompleto}**\n\nEscolha o veículo correto abaixo:`,
                     tipo: 'multiplos',
-                    opcoes: veiculosEncontrados
+                    metadata: {
+                        options: options,
+                        selectionTitle: 'Veículos do cliente:'
+                    }
                 };
             }
         }
@@ -593,10 +667,23 @@ async function processarAgendamento(mensagem, usuario_id) {
                 veiculo = cliente.veiculos[0];
                 console.log(`   ✅ Único veículo do cliente selecionado automaticamente: ${veiculo.marca} ${veiculo.modelo}`);
             } else {
+                // Formatar opções para seleção no frontend
+                const options = cliente.veiculos.map((v) => ({
+                    id: v.id,
+                    label: `${v.marca} ${v.modelo} ${v.anoModelo || ''}`,
+                    subtitle: `Placa: ${v.placa}`,
+                    details: v.cor ? [`Cor: ${v.cor}`] : [],
+                    value: `Agendar para o veículo ${v.placa} do cliente ${cliente.nomeCompleto}`
+                }));
+
                 return {
                     success: false,
-                    response: `🚗 **${entidades.veiculo ? `Veículo "${entidades.veiculo}" não encontrado` : 'Qual veículo deseja agendar?'}**\n\n**Cliente:** ${cliente.nomeCompleto}\n\n**Veículos disponíveis:**\n${cliente.veiculos.map((v, i) => `${i + 1}. ${v.marca} ${v.modelo}${v.anoModelo ? ` ${v.anoModelo}` : ''} - ${v.placa}${v.cor ? ` (${v.cor})` : ''}`).join('\n')}\n\n💡 Digite o número, modelo ou placa do veículo`,
+                    response: `🚗 **${entidades.veiculo ? `Veículo "${entidades.veiculo}" não encontrado.` : 'Qual veículo deseja agendar?'}**\n\n**Cliente:** ${cliente.nomeCompleto}\n\nEscolha o veículo abaixo:`,
                     tipo: 'pergunta',
+                    metadata: {
+                        options: options,
+                        selectionTitle: 'Veículos disponíveis:'
+                    },
                     opcoes: cliente.veiculos
                 };
             }
