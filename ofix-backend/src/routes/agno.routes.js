@@ -163,6 +163,7 @@ router.post('/chat-inteligente', async (req, res) => {
 
         console.log('🎯 Chat Inteligente - Mensagem:', message.substring(0, 80) + '...');
         console.log('🎯 Contexto ativo:', contexto_ativo);
+        console.log('🎯 Usuario ID:', usuario_id);
 
         // 🎯 USAR CONTEXTO ATIVO PARA SOBRESCREVER INTENÇÃO QUANDO APLICÁVEL
         let intencao;
@@ -239,6 +240,13 @@ router.post('/chat-inteligente', async (req, res) => {
         // 2. PROCESSAR BASEADO NA INTENÇÃO
         let response;
 
+        console.log('   🎯 Intenção detectada:', intencao);
+        
+        // Verificar se há contexto ativo e se deve sobrepor a intenção
+        if (contexto_ativo) {
+            console.log('   🎯 Contexto ativo sobrescrevendo intenção:', contexto_ativo);
+        }
+
         // 🤖 Para consultas de preço e ajuda, tentar chamar Agno primeiro
         if ((intencao === 'CONSULTA_PRECO' || intencao === 'AJUDA') && AGNO_API_URL && AGNO_API_URL !== 'http://localhost:8000') {
             try {
@@ -272,6 +280,7 @@ router.post('/chat-inteligente', async (req, res) => {
             }
         } else {
             // Processar localmente para outras intenções
+            console.log('   🔄 Processando localmente intenção:', intencao);
             switch (intencao) {
                 case 'CONSULTA_PRECO':
                     const servico = nlp?.entidades?.servico || 'serviço';
@@ -305,7 +314,9 @@ router.post('/chat-inteligente', async (req, res) => {
                     break;
 
                 case 'CONSULTA_CLIENTE':
+                    console.log('🔍 Chamando processarConsultaCliente com:', { message, contexto_ativo, usuario_id });
                     response = await processarConsultaCliente(message, contexto_ativo, usuario_id);
+                    console.log('🔍 Resposta de processarConsultaCliente:', response);
                     break;
 
                 case 'CADASTRAR_CLIENTE':
