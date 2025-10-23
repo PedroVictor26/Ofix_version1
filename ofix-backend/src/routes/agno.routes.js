@@ -464,13 +464,39 @@ async function processarAgendamento(mensagem, usuario_id, cliente_selecionado = 
         console.log('   📋 Entidades:', JSON.stringify(entidades, null, 2));
 
         // 2. VALIDAR DADOS NECESSÁRIOS
-        const validacao = NLPService.validarDadosAgendamento(entidades);
+        // SE HOUVER CLIENTE SELECIONADO, NÃO VALIDAR A NECESSIDADE DO CLIENTE
+        let validacao;
+        if (cliente_selecionado) {
+            // Criar validação personalizada que ignora a falta de cliente
+            const entidadesObrigatorias = ['servico', 'dia', 'hora'];
+            const faltando = [];
+            
+            if (!entidades.servico) faltando.push('• **Serviço:** Tipo de manutenção (revisão, troca de óleo, etc)');
+            if (!entidades.diaSemana && !entidades.dataEspecifica) faltando.push('• **Dia:** Dia da semana ou data (segunda, terça, 20/10)');
+            if (!entidades.hora) faltando.push('• **Horário:** Hora desejada (14h, 16:00)');
+            
+            // Não exigir veículo pois podemos usar o veículo do cliente selecionado
+            // ou pedir para selecionar um dos veículos do cliente
+            validacao = {
+                valido: faltando.length === 0,
+                faltando: faltando
+            };
+        } else {
+            validacao = NLPService.validarDadosAgendamento(entidades);
+        }
 
         if (!validacao.valido) {
             // Mensagem personalizada baseada no que está faltando
             let mensagemAjuda = '📋 **Vamos fazer seu agendamento!**\n\n';
 
-            if (validacao.faltando.length === 4 || validacao.faltando.length === 5) {
+            if (cliente_selecionado) {
+                // O cliente já está selecionado, mostrar mensagem personalizada
+                mensagemAjuda += `**Cliente selecionado:** ${cliente_selecionado.nomeCompleto}\n\n`;
+                mensagemAjuda += '💡 **Me informe os dados restantes:**\n\n';
+                mensagemAjuda += validacao.faltando.join('\n');
+                mensagemAjuda += '\n\n**Exemplo:**\n';
+                mensagemAjuda += '"Agendar revisão na segunda às 14h" ou "Troca de óleo amanhã às 10h"';
+            } else if (validacao.faltando.length === 4 || validacao.faltando.length === 5) {
                 // Está faltando quase tudo - dar exemplo completo
                 mensagemAjuda += '💡 **Me informe os seguintes dados:**\n\n';
                 mensagemAjuda += '• **Cliente:** Nome do cliente\n';
@@ -491,9 +517,15 @@ async function processarAgendamento(mensagem, usuario_id, cliente_selecionado = 
                 if (entidades.servico) partes.push(entidades.servico);
                 else partes.push('revisão');
 
-                if (entidades.veiculo) partes.push(`para o ${entidades.veiculo}`);
-                else if (entidades.cliente) partes.push(`para o cliente ${entidades.cliente}`);
-                else partes.push('para o Gol do João');
+                if (cliente_selecionado) {
+                    partes.push(`para o cliente ${cliente_selecionado.nomeCompleto}`);
+                } else if (entidades.veiculo) {
+                    partes.push(`para o ${entidades.veiculo}`);
+                } else if (entidades.cliente) {
+                    partes.push(`para o cliente ${entidades.cliente}`);
+                } else {
+                    partes.push('para o Gol do João');
+                }
 
                 if (entidades.diaSemana || entidades.dataEspecifica) {
                     partes.push(entidades.diaTexto || new Date(entidades.dataEspecifica).toLocaleDateString('pt-BR'));
