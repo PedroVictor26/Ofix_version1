@@ -337,7 +337,12 @@ router.post('/chat-inteligente', async (req, res) => {
 
                 default:
                     // Conversa geral - pode enviar para Agno Agent se configurado
-                    response = await processarConversaGeral(message);
+                    // MAS: Se a mensagem for 'agendar' e houver cliente selecionado, forçar AGENDAMENTO
+                    if (message.toLowerCase().includes('agendar') && req.body.cliente_selecionado) {
+                        response = await processarAgendamento(message, usuario_id, req.body.cliente_selecionado);
+                    } else {
+                        response = await processarConversaGeral(message);
+                    }
                     break;
             }
         }
