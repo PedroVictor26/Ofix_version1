@@ -1,0 +1,4 @@
+        } else {
+            // Se não veio formatado, tenta pegar a última palavra relevante
+            const palavras = mensagem.split(/\s+/);
+            termoBusca = palavras[palavras.length - 1];
