@@ -590,6 +590,227 @@ const AIPage = () => {
   const enviarMensagem = async () => {
     if (!mensagem.trim() || carregando) return;
 
+    // Verificar se estamos no contexto de busca de cliente e a mensagem é um número
+    if (contextoAtivo === 'buscar_cliente' && /^\d+$/.test(mensagem.trim())) {
+      const numeroDigitado = parseInt(mensagem.trim());
+      
+      // Encontrar a última mensagem do assistente com clientes
+      const ultimaMensagemAssistente = [...conversas].reverse().find(c => 
+        c.tipo !== 'usuario' && (c.metadata?.clientes || c.tipo === 'consulta_cliente')
+      );
+      
+      if (ultimaMensagemAssistente) {
+        // Tentar extrair clientes da resposta, mesmo que não estejam no metadata
+        const responseContent = ultimaMensagemAssistente.conteudo;
+        const linhas = responseContent.split('\n');
+        const clientesExtraidos = [];
+        
+        for (const linha of linhas) {
+          const match = linha.match(/^(\d+)\.\s*\*\*(.+?)\*\*/);
+          if (match) {
+            const numero = parseInt(match[1]);
+            const nome = match[2].trim();
+            clientesExtraidos.push({
+              id: numero,
+              label: nome,
+              value: numero.toString()
+            });
+          }
+        }
+        
+        const clientes = clientesExtraidos.length > 0 ? clientesExtraidos : ultimaMensagemAssistente.metadata?.clientes;
+        
+        if (clientes && numeroDigitado >= 1 && numeroDigitado <= clientes.length) {
+          // O usuário digitou um número válido de cliente
+          const clienteSelecionado = clientes[numeroDigitado - 1];
+          
+          // Enviar mensagem como se o usuário tivesse selecionado a opção
+          const novaMensagem = {
+            id: Date.now(),
+            tipo: 'usuario',
+            conteudo: `${numeroDigitado}`,
+            timestamp: new Date().toISOString(),
+            metadata: {
+              contexto: contextoAtivo
+            }
+          };
+
+          setConversas(prev => {
+            const novasConversas = [...prev, novaMensagem];
+            salvarConversasLocal(novasConversas);
+            return novasConversas;
+          });
+          
+          setMensagem('');
+          setCarregando(true);
+          
+          try {
+            const authHeaders = getAuthHeaders();
+
+            const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:1000';
+            const API_BASE = API_BASE_URL.replace('/api', '');
+            
+            // Preparar body da requisição
+            const requestBody = {
+              message: novaMensagem.conteudo,
+              usuario_id: user?.id,
+              contexto_conversa: conversas.slice(-5).map(c => ({
+                tipo: c.tipo,
+                conteudo: c.conteudo
+              })),
+              contexto_ativo: contextoAtivo
+            };
+            
+            logger.info('🚀 Enviando requisição ao backend (seleção de cliente)', {
+              endpoint: `${API_BASE}/agno/chat-inteligente`,
+              contextoAtivo: contextoAtivo,
+              message: novaMensagem.conteudo,
+              context: 'enviarMensagem'
+            });
+
+            const response = await fetch(`${API_BASE}/agno/chat-inteligente`, {
+              method: 'POST',
+              headers: authHeaders,
+              body: JSON.stringify(requestBody)
+            });
+
+            if (response.ok) {
+              const data = await response.json();
+              
+              let responseContent = '';
+              let tipoResposta = 'agente';
+
+              if (data.response) {
+                if (typeof data.response === 'string') {
+                  responseContent = data.response;
+                } else if (typeof data.response === 'object') {
+                  responseContent = data.response.content ||
+                    data.response.message ||
+                    data.response.output ||
+                    JSON.stringify(data.response, null, 2);
+                } else {
+                  responseContent = String(data.response);
+                }
+
+                if (data.tipo) {
+                  tipoResposta = data.tipo;
+                }
+              } else if (data.message) {
+                responseContent = data.message;
+                tipoResposta = data.success ? 'agente' : 'erro';
+              } else {
+                responseContent = 'Resposta recebida do agente.';
+                tipoResposta = 'agente';
+              }
+
+              // Verificar se a resposta indica que o cliente foi selecionado
+              if (responseContent.includes('Cliente selecionado') || responseContent.includes('cliente selecionado')) {
+                // Atualizar contexto para refletir que um cliente foi selecionado
+                setContextoAtivo('cliente_selecionado');
+              }
+
+              const respostaAgente = {
+                id: Date.now() + 1,
+                tipo: tipoResposta,
+                conteudo: responseContent,
+                timestamp: new Date().toISOString(),
+                metadata: {
+                  ...data.metadata,
+                  dadosExtraidos: data.dadosExtraidos,
+                  actions: data.metadata?.actions
+                }
+              };
+
+              setConversas(prev => {
+                const novasConversas = [...prev, respostaAgente];
+                salvarConversasLocal(novasConversas);
+                return novasConversas;
+              });
+
+              // ✅ LIMPAR CONTEXTO APÓS SUCESSO
+              if (data.success && contextoAtivo && !responseContent.includes('Cliente selecionado')) {
+                setContextoAtivo(null);
+              }
+
+              // Falar resposta se voz habilitada
+              if (vozHabilitada && responseContent && 'speechSynthesis' in window) {
+                try {
+                  const textoLimpo = responseContent
+                    .replace(/\*\*(.*?)\*\*/g, '$1')
+                    .replace(/\*(.*?)\*/g, '$1')
+                    .replace(/#{1,6}\s/g, '')
+                    .replace(/```[\s\S]*?```/g, '')
+                    .replace(/`([^`]+)`/g, '$1')
+                    .replace(/\n{2,}/g, '. ')
+                    .replace(/\n/g, ' ')
+                    .replace(/[•✅❌📋🔧🚗💼📊🔍🆕👤📅💰📦]/gu, '')
+                    .trim();
+
+                  if (textoLimpo.length > 0 && textoLimpo.length < AI_CONFIG.VOICE.MAX_TEXT_LENGTH_FOR_SPEECH) {
+                    falarTexto(textoLimpo);
+                  }
+                } catch (error) {
+                  logger.error('Erro ao preparar texto para fala', {
+                    error: error.message
+                  });
+                }
+              }
+            } else {
+              throw new Error(`Erro na API: ${response.status}`);
+            }
+          } catch (error) {
+            logger.error('Erro ao enviar mensagem de seleção de cliente', {
+              error: error.message,
+              stack: error.stack,
+              userId: user?.id,
+              messageLength: mensagem.length,
+              contextoAtivo: contextoAtivo,
+              context: 'enviarMensagem'
+            });
+
+            showToast('Erro ao processar seleção de cliente. Tente novamente.', 'error');
+
+            const mensagemErro = {
+              id: Date.now() + 1,
+              tipo: 'erro',
+              conteudo: 'Desculpe, ocorreu um erro ao processar sua seleção de cliente. Tente novamente em instantes.',
+              timestamp: new Date().toISOString()
+            };
+
+            setConversas(prev => [...prev, mensagemErro]);
+          } finally {
+            setCarregando(false);
+          }
+          
+          return; // Sair da função para evitar o processamento duplicado
+        } else {
+          // Número fora do intervalo
+          const mensagemErro = {
+            id: Date.now(),
+            tipo: 'erro',
+            conteudo: `❌ Número inválido: ${numeroDigitado}\n\nPor favor, escolha um número entre 1 e ${clientes ? clientes.length : 'N/A'}.`,
+            timestamp: new Date().toISOString()
+          };
+
+          setConversas(prev => {
+            const novasConversas = [...prev, mensagemErro];
+            salvarConversasLocal(novasConversas);
+            return novasConversas;
+          });
+          
+          setMensagem('');
+          return;
+        }
+      } else {
+        // Se não encontrou uma mensagem de consulta de cliente, mas ainda estamos no contexto, 
+        // podemos tentar processar normalmente
+        logger.warn('Nenhuma mensagem de consulta de cliente encontrada no histórico', {
+          contextoAtivo,
+          mensagem: mensagem.trim()
+        });
+      }
+    }
+
     // ✅ VALIDAR MENSAGEM
     const validacao = validarMensagem(mensagem);
 
@@ -752,17 +973,57 @@ const AIPage = () => {
 
         const acoesInline = gerarAcoesInline(tipoResposta, data.metadata);
         
+        // Processar conteúdo para detectar clientes listados
+        let metadataAtualizado = {
+          ...data.metadata,
+          dadosExtraidos: data.dadosExtraidos,
+          actions: acoesInline
+        };
+
+        // Se for uma consulta de cliente, extrair informações da resposta
+        if (tipoResposta === 'consulta_cliente' || contextoAtivo === 'buscar_cliente') {
+          // Processar o conteúdo linha por linha para identificar clientes
+          const linhas = responseContent.split('\n');
+          const clientesExtraidos = [];
+          let ultimoNumero = 0;
+          
+          for (const linha of linhas) {
+            // Padrão para identificar clientes numerados: "1. **Nome do Cliente**"
+            const match = linha.match(/^(\d+)\.\s*\*\*(.+?)\*\*/);
+            if (match) {
+              const numero = parseInt(match[1]);
+              const nome = match[2].trim();
+              
+              clientesExtraidos.push({
+                id: numero, // Usando número como ID temporário
+                label: nome,
+                value: numero.toString()
+              });
+              
+              ultimoNumero = numero;
+            }
+          }
+          
+          if (clientesExtraidos.length > 0) {
+            metadataAtualizado = {
+              ...metadataAtualizado,
+              clientes: clientesExtraidos
+            };
+          }
+        }
+
         const respostaAgente = {
           id: Date.now() + 1,
           tipo: tipoResposta,
           conteudo: responseContent,
           timestamp: new Date().toISOString(),
-          metadata: {
-            ...data.metadata,
-            dadosExtraidos: data.dadosExtraidos,
-            actions: acoesInline
-          }
+          metadata: metadataAtualizado
         };
+
+        // Adicionando a renderização da lista de seleção de clientes se necessário
+        if (tipoResposta === 'consulta_cliente' && metadataAtualizado.clientes && metadataAtualizado.clientes.length > 0) {
+          // Esta renderização já é tratada no JSX do componente
+        }
 
         setConversas(prev => {
           const novasConversas = [...prev, respostaAgente];
@@ -1247,6 +1508,45 @@ const AIPage = () => {
                       }
                     }}
                   />
+                )}
+                
+                {/* Adicionando lógica para seleção de cliente por número */}
+                {conversa.tipo === 'consulta_cliente' && conversa.metadata?.clientes && (
+                  <div className="mt-3 pt-3 border-t border-slate-200">
+                    <p className="text-xs font-medium text-slate-600 mb-2">Digite o número do cliente para selecionar:</p>
+                    <div className="space-y-2">
+                      {conversa.metadata.clientes.map((cliente, index) => (
+                        <button
+                          key={cliente.id}
+                          onClick={() => {
+                            logger.info('Cliente selecionado por número', { cliente, index: index + 1 });
+                            setMensagem(`${index + 1}`);
+                            setTimeout(() => enviarMensagem(), 100);
+                          }}
+                          className="w-full text-left px-3 py-2 rounded-lg border border-slate-200 hover:border-blue-400 hover:bg-blue-50 transition-all duration-200 group"
+                        >
+                          <div className="flex items-start gap-2">
+                            <div className="flex-shrink-0 w-6 h-6 rounded-full bg-slate-100 group-hover:bg-blue-100 flex items-center justify-center text-xs font-medium text-slate-600 group-hover:text-blue-600">
+                              {index + 1}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="text-sm font-medium text-slate-900 group-hover:text-blue-900">
+                                {cliente.nomeCompleto}
+                              </div>
+                              <div className="text-xs text-slate-500 mt-0.5">
+                                {cliente.telefone || 'Sem telefone'}
+                              </div>
+                              {cliente.veiculos && cliente.veiculos.length > 0 && (
+                                <div className="text-xs text-slate-400 mt-1">
+                                  Veículos: {cliente.veiculos.map(v => `${v.marca} ${v.modelo}`).join(', ')}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                 )}
                 
                 {/* Botão para abrir modal em mensagens de cadastro */}

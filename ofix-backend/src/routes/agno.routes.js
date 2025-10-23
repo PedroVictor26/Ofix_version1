@@ -9,10 +9,6 @@ import ConsultasOSService from '../services/consultasOS.service.js';
 import NLPService from '../services/nlp.service.js';
 import prisma from '../config/database.js';
 
-// Cache simples para manter contexto de seleção de clientes por usuário
-const contextoSelecaoClientes = new Map(); // { usuarioId: { clientes: [...], timestamp: Date } }
-const TEMPO_EXPIRACAO = 10 * 60 * 1000; // 10 minutos
-
 const router = express.Router();
 
 // Configurações do Agno (pode vir de variáveis de ambiente)
@@ -309,7 +305,7 @@ router.post('/chat-inteligente', async (req, res) => {
                     break;
 
                 case 'CONSULTA_CLIENTE':
-                    response = await processarConsultaCliente(message, contexto_ativo, usuario_id);
+                    response = await processarConsultaCliente(message);
                     break;
 
                 case 'CADASTRAR_CLIENTE':
@@ -911,51 +907,8 @@ async function processarEstatisticas(mensagem) {
 // 👤 FUNÇÃO: PROCESSAR CONSULTA CLIENTE
 // ============================================================================
 
-async function processarConsultaCliente(mensagem, contexto_ativo = null, usuario_id = null) {
+async function processarConsultaCliente(mensagem) {
     try {
-        // Verificar se a mensagem é um número e se estamos em um contexto de seleção de cliente
-        // ou se a mensagem é composta apenas por um número (o que indica seleção)
-        const mensagemTrimmed = mensagem.trim();
-        if (mensagemTrimmed.match(/^\d+$/)) {  // Verifica se a mensagem contém apenas dígitos
-            const numeroDigitado = parseInt(mensagemTrimmed);
-            
-            // Verificar se há clientes armazenados no cache para este usuário
-            if (usuario_id && contextoSelecaoClientes.has(usuario_id)) {
-                const dadosCache = contextoSelecaoClientes.get(usuario_id);
-                
-                // Verificar se o cache ainda é válido (não expirou)
-                if (Date.now() - dadosCache.timestamp < TEMPO_EXPIRACAO) {
-                    const clientes = dadosCache.clientes;
-                    
-                    // O usuário digitou um número em resposta à lista de clientes
-                    if (numeroDigitado >= 1 && numeroDigitado <= clientes.length) {
-                        const clienteSelecionado = clientes[numeroDigitado - 1];
-                        
-                        // Limpar o cache após seleção bem-sucedida
-                        contextoSelecaoClientes.delete(usuario_id);
-                        
-                        return {
-                            success: true,
-                            response: `✅ **Cliente selecionado:** ${clienteSelecionado.nomeCompleto}\n\nTelefone: ${clienteSelecionado.telefone || 'Não informado'}\nCPF/CNPJ: ${clienteSelecionado.cpfCnpj || 'Não informado'}\nVeículos: ${clienteSelecionado.veiculos && clienteSelecionado.veiculos.length > 0 ? clienteSelecionado.veiculos.map(v => v.modelo).join(', ') : 'Nenhum veículo cadastrado'}\n\n💡 O que deseja fazer com este cliente?\n• "agendar" - Agendar serviço\n• "editar" - Editar dados\n• "histórico" - Ver histórico de serviços`,
-                            tipo: 'cliente_selecionado',
-                            cliente: clienteSelecionado,
-                            cliente_id: clienteSelecionado.id
-                        };
-                    } else {
-                        // Número fora do intervalo
-                        return {
-                            success: false,
-                            response: `❌ **Número inválido:** ${numeroDigitado}\n\nPor favor, escolha um número entre 1 e ${clientes.length}.`,
-                            tipo: 'erro'
-                        };
-                    }
-                } else {
-                    // Cache expirado, remover entrada
-                    contextoSelecaoClientes.delete(usuario_id);
-                }
-            }
-        }
-
         // Extrair nome, telefone ou cpf da mensagem
         const padraoNome = /(?:nome|cliente|dados do cliente|consultar cliente|buscar cliente|telefone|cpf|cnpj):?\s*([A-ZÀ-Üa-zà-ü0-9\s-]+)/i;
         let termoBusca = null;
@@ -996,14 +949,6 @@ async function processarConsultaCliente(mensagem, contexto_ativo = null, usuario
             };
         }
 
-        // Armazenar os clientes no cache para seleção futura, se tivermos usuario_id
-        if (usuario_id) {
-            contextoSelecaoClientes.set(usuario_id, {
-                clientes: clientes,
-                timestamp: Date.now()
-            });
-        }
-
         // Montar resposta com lista de clientes
         let resposta = `👤 **Clientes encontrados:**\n\n`;
         clientes.forEach((c, idx) => {
@@ -1022,7 +967,17 @@ async function processarConsultaCliente(mensagem, contexto_ativo = null, usuario
             success: true,
             response: resposta,
             tipo: 'consulta_cliente',
-            clientes: clientes,
+            metadata: {
+                clientes: clientes,
+                options: clientes.map((c, idx) => ({
+                    id: c.id,
+                    label: c.nomeCompleto,
+                    subtitle: c.telefone || 'Sem telefone',
+                    details: c.veiculos && c.veiculos.length > 0 ? [`🚗 ${c.veiculos.map(v => `${v.marca} ${v.modelo}`).join(', ')}`] : [],
+                    value: (idx + 1).toString() // Valor que será enviado ao selecionar por número
+                })),
+                selectionTitle: 'Clientes encontrados:'
+            },
             contexto_ativo: 'buscar_cliente'  // Sinaliza que estamos em modo de busca de cliente
         };
     } catch (error) {
