@@ -1047,9 +1047,12 @@ const AIPage = () => {
           // Não abre automaticamente, espera usuário clicar no botão
         }
 
-        // ✅ LIMPAR CONTEXTO APÓS SUCESSO
+        // ✅ LIMPAR CONTEXTO APÓS SUCESSO - EXCETO PARA CONSULTA_CLIENTE
         if (data.success && contextoAtivo) {
-          setContextoAtivo(null);
+          // Não limpar o contexto se for uma consulta de cliente, pois o usuário ainda precisa selecionar
+          if (tipoResposta !== 'consulta_cliente') {
+            setContextoAtivo(null);
+          }
         }
 
         // Falar resposta se voz habilitada
