@@ -15,6 +15,10 @@ const router = express.Router();
 const AGNO_API_URL = process.env.AGNO_API_URL || 'http://localhost:8000';
 const AGNO_API_TOKEN = process.env.AGNO_API_TOKEN || '';
 
+// Cache simples para manter contexto de seleção de clientes por usuário
+const contextoSelecaoClientes = new Map(); // { usuarioId: { clientes: [...], timestamp: Date } }
+const TEMPO_EXPIRACAO = 10 * 60 * 1000; // 10 minutos
+
 // Registro de context e knowledge para o Agno
 const AGNO_CONTEXT = {
     name: "OFIX - Sistema de Oficina Automotiva",
