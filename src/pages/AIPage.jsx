@@ -49,6 +49,7 @@ const AIPage = () => {
 
   // ✅ NOVOS ESTADOS - Melhorias Críticas para Busca de Clientes
   const [contextoAtivo, setContextoAtivo] = useState(null);
+  const [clienteSelecionado, setClienteSelecionado] = useState(null);
   const [inputWarning, setInputWarning] = useState('');
   const [inputHint, setInputHint] = useState('');
 
@@ -879,7 +880,8 @@ const AIPage = () => {
           tipo: c.tipo,
           conteudo: c.conteudo
         })),
-        contexto_ativo: contextoAtivo  // ✅ Envia contexto ativo
+        contexto_ativo: contextoAtivo,  // ✅ Envia contexto ativo
+        cliente_selecionado: clienteSelecionado  // ✅ Envia cliente selecionado
       };
       
       // Adicionar NLP se disponível
@@ -1053,6 +1055,11 @@ const AIPage = () => {
           if (tipoResposta !== 'consulta_cliente') {
             setContextoAtivo(null);
           }
+        }
+        
+        // Atualizar cliente selecionado se for uma seleção
+        if (tipoResposta === 'cliente_selecionado' && data.cliente) {
+          setClienteSelecionado(data.cliente);
         }
 
         // Falar resposta se voz habilitada

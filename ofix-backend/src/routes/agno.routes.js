@@ -302,7 +302,7 @@ router.post('/chat-inteligente', async (req, res) => {
                     break;
 
                 case 'AGENDAMENTO':
-                    response = await processarAgendamento(message, usuario_id);
+                    response = await processarAgendamento(message, usuario_id, req.body.cliente_selecionado);
                     break;
 
                 case 'CONSULTA_OS':
@@ -441,7 +441,7 @@ router.get('/historico-conversa', async (req, res) => {
 // 📅 FUNÇÃO: PROCESSAR AGENDAMENTO
 // ============================================================================
 
-async function processarAgendamento(mensagem, usuario_id) {
+async function processarAgendamento(mensagem, usuario_id, cliente_selecionado = null) {
     try {
         // 0. BUSCAR OFICINA DO USUÁRIO
         let oficinaId = null;
@@ -515,7 +515,15 @@ async function processarAgendamento(mensagem, usuario_id) {
         let cliente = null;
         let clientesSugeridos = [];
 
-        if (entidades.cliente) {
+        // Se houver um cliente selecionado previamente, usá-lo
+        if (cliente_selecionado) {
+            cliente = await prisma.cliente.findFirst({
+                where: { id: cliente_selecionado.id },
+                include: {
+                    veiculos: true
+                }
+            });
+        } else if (entidades.cliente) {
             // Busca exata primeiro (FILTRADO POR OFICINA)
             const whereClause = {
                 nomeCompleto: {
