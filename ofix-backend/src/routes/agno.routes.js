@@ -909,10 +909,17 @@ async function processarEstatisticas(mensagem) {
 
 async function processarConsultaCliente(mensagem, contexto_ativo = null, usuario_id = null) {
     try {
+        console.log('🔍 DEBUG: processarConsultaCliente - Mensagem recebida:', mensagem);
+        console.log('🔍 DEBUG: processarConsultaCliente - Contexto ativo:', contexto_ativo);
+        console.log('🔍 DEBUG: processarConsultaCliente - Usuario ID:', usuario_id);
+        
         // Verificar se a mensagem é um número e se estamos em um contexto de seleção de cliente
         // ou se a mensagem é composta apenas por um número (o que indica seleção)
         const mensagemTrimmed = mensagem.trim();
+        console.log('🔍 DEBUG: Mensagem após trim:', mensagemTrimmed);
+        
         if (mensagemTrimmed.match(/^\d+$/)) {  // Verifica se a mensagem contém apenas dígitos
+            console.log('🔢 DEBUG: Detectado número, tentando seleção de cliente');
             const numeroDigitado = parseInt(mensagemTrimmed);
             
             // Verificar se há clientes armazenados no cache para este usuário
@@ -922,10 +929,12 @@ async function processarConsultaCliente(mensagem, contexto_ativo = null, usuario
                 // Verificar se o cache ainda é válido (não expirou)
                 if (Date.now() - dadosCache.timestamp < TEMPO_EXPIRACAO) {
                     const clientes = dadosCache.clientes;
+                    console.log('🔢 DEBUG: Clientes no cache:', clientes.length);
                     
                     // O usuário digitou um número em resposta à lista de clientes
                     if (numeroDigitado >= 1 && numeroDigitado <= clientes.length) {
                         const clienteSelecionado = clientes[numeroDigitado - 1];
+                        console.log('🔢 DEBUG: Cliente selecionado:', clienteSelecionado.nomeCompleto);
                         
                         // Limpar o cache após seleção bem-sucedida
                         contextoSelecaoClientes.delete(usuario_id);
@@ -939,6 +948,7 @@ async function processarConsultaCliente(mensagem, contexto_ativo = null, usuario
                         };
                     } else {
                         // Número fora do intervalo
+                        console.log('🔢 DEBUG: Número fora do intervalo:', numeroDigitado);
                         return {
                             success: false,
                             response: `❌ **Número inválido:** ${numeroDigitado}\n\nPor favor, escolha um número entre 1 e ${clientes.length}.`,
@@ -946,9 +956,12 @@ async function processarConsultaCliente(mensagem, contexto_ativo = null, usuario
                         };
                     }
                 } else {
+                    console.log('🔢 DEBUG: Cache expirado ou não encontrado para o usuário:', usuario_id);
                     // Cache expirado, remover entrada
                     contextoSelecaoClientes.delete(usuario_id);
                 }
+            } else {
+                console.log('🔢 DEBUG: Nenhum cache encontrado para o usuário ou usuário não informado');
             }
         }
 
@@ -956,14 +969,18 @@ async function processarConsultaCliente(mensagem, contexto_ativo = null, usuario
         const padraoNome = /(?:nome|cliente|dados do cliente|consultar cliente|buscar cliente|telefone|cpf|cnpj):?\s*([A-ZÀ-Üa-zà-ü0-9\s-]+)/i;
         let termoBusca = null;
         const matchNome = mensagem.match(padraoNome);
+        
         if (matchNome) {
             termoBusca = matchNome[1].trim();
+            console.log('🔍 DEBUG: Termo de busca extraído do padrão:', termoBusca);
         } else {
             // Se não veio formatado, usa a mensagem inteira (útil para nomes compostos)
             termoBusca = mensagem.trim();
+            console.log('🔍 DEBUG: Termo de busca usando mensagem completa:', termoBusca);
         }
 
         if (!termoBusca || termoBusca.length < 2) {
+            console.log('🔍 DEBUG: Termo de busca inválido ou muito curto');
             return {
                 success: false,
                 response: '❌ Informe o nome, telefone ou CPF do cliente para consultar.',
@@ -972,6 +989,8 @@ async function processarConsultaCliente(mensagem, contexto_ativo = null, usuario
         }
 
         // Buscar clientes por nome, telefone ou cpf
+        console.log('🔍 DEBUG: Iniciando busca no banco de dados para:', termoBusca);
+        
         const clientes = await prisma.cliente.findMany({
             where: {
                 OR: [
@@ -982,8 +1001,14 @@ async function processarConsultaCliente(mensagem, contexto_ativo = null, usuario
             },
             include: { veiculos: true }
         });
+        
+        console.log('🔍 DEBUG: Resultado da busca - encontrados:', clientes.length, 'clientes');
+        if (clientes.length > 0) {
+            console.log('🔍 DEBUG: Clientes encontrados:', clientes.map(c => c.nomeCompleto));
+        }
 
         if (clientes.length === 0) {
+            console.log('🔍 DEBUG: Nenhum cliente encontrado para o termo de busca:', termoBusca);
             return {
                 success: false,
                 response: `❌ Nenhum cliente encontrado para "${termoBusca}".\n\nTente informar nome completo, telefone ou CPF.`,
@@ -997,6 +1022,7 @@ async function processarConsultaCliente(mensagem, contexto_ativo = null, usuario
                 clientes: clientes,
                 timestamp: Date.now()
             });
+            console.log('🔍 DEBUG: Clientes armazenados no cache para usuário:', usuario_id);
         }
 
         // Montar resposta com lista de clientes
@@ -1031,6 +1057,7 @@ async function processarConsultaCliente(mensagem, contexto_ativo = null, usuario
             contexto_ativo: 'buscar_cliente'  // Sinaliza que estamos em modo de busca de cliente
         };
     } catch (error) {
+        console.error('❌ Erro em processarConsultaCliente:', error.message);
         return {
             success: false,
             response: '❌ Erro ao consultar cliente',
