@@ -467,6 +467,28 @@ async function processarAgendamento(mensagem, usuario_id, cliente_selecionado = 
         // SE HOUVER CLIENTE SELECIONADO, NÃO VALIDAR A NECESSIDADE DO CLIENTE
         let validacao;
         if (cliente_selecionado) {
+            // Quando o cliente já está selecionado e a mensagem é apenas "agendar",
+            // retornar uma resposta personalizada pedindo apenas os dados restantes
+            if (mensagem.trim().toLowerCase() === 'agendar') {
+                return {
+                    success: false,
+                    response: `📋 **Agendamento para ${cliente_selecionado.nomeCompleto}**\n\n` +
+                             `💡 **Me informe os dados restantes:**\n\n` +
+                             `• **Serviço:** Tipo de manutenção (revisão, troca de óleo, etc)\n` +
+                             `• **Dia:** Dia da semana ou data (segunda, terça, 20/10)\n` +
+                             `• **Horário:** Hora desejada (14h, 16:00)\n\n` +
+                             `**Exemplo:**\n` +
+                             `"Revisão na segunda às 14h" ou "Troca de óleo amanhã às 10h"`,
+                    tipo: 'pergunta',
+                    cliente_selecionado: cliente_selecionado,
+                    faltando: [
+                        '• **Serviço:** Tipo de manutenção (revisão, troca de óleo, etc)',
+                        '• **Dia:** Dia da semana ou data (segunda, terça, 20/10)',
+                        '• **Horário:** Hora desejada (14h, 16:00)'
+                    ]
+                };
+            }
+            
             // Criar validação personalizada que ignora a falta de cliente
             const entidadesObrigatorias = ['servico', 'dia', 'hora'];
             const faltando = [];
