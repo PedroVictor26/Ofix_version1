@@ -235,3 +235,8 @@ The project includes:
 - Linting and security audit scripts
 - Error boundaries for graceful error handling
 - Comprehensive logging system
+
+
+sempre fale em portugues
+
+quando terminar alterações pergunte se quer que suba para o github

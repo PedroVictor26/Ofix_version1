@@ -1024,6 +1024,11 @@ const AIPage = () => {
         if (tipoResposta === 'consulta_cliente' && metadataAtualizado.clientes && metadataAtualizado.clientes.length > 0) {
           // Esta renderização já é tratada no JSX do componente
         }
+        
+        // Manter o contexto de busca de cliente se for uma resposta de consulta
+        if (tipoResposta === 'consulta_cliente') {
+          setContextoAtivo('buscar_cliente');
+        }
 
         setConversas(prev => {
           const novasConversas = [...prev, respostaAgente];

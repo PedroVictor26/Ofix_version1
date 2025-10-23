@@ -963,6 +963,14 @@ async function processarConsultaCliente(mensagem) {
 
         resposta += `\n💡 Digite o número do cliente para selecionar ou "agendar" para iniciar um agendamento.`;
 
+        // Armazenar os clientes no cache para seleção futura, se tivermos usuario_id
+        if (usuario_id) {
+            contextoSelecaoClientes.set(usuario_id, {
+                clientes: clientes,
+                timestamp: Date.now()
+            });
+        }
+
         return {
             success: true,
             response: resposta,
