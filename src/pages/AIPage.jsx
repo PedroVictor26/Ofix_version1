@@ -54,13 +54,16 @@ const AIPage = () => {
     try {
       const clienteSalvo = localStorage.getItem('clienteSelecionado');
       if (clienteSalvo) {
-        console.log('🔍 DEBUG: Cliente selecionado recuperado do localStorage:', JSON.parse(clienteSalvo));
-        return JSON.parse(clienteSalvo);
+        const clienteParseado = JSON.parse(clienteSalvo);
+        console.log('🔍 DEBUG: Cliente selecionado recuperado do localStorage:', clienteParseado);
+        console.log('🔍 DEBUG: Cliente JSON string recuperado:', clienteSalvo.substring(0, 100) + '...');
+        return clienteParseado;
+      } else {
+        console.log('🔍 DEBUG: Nenhum cliente selecionado no localStorage');
       }
     } catch (error) {
       console.error('❌ Erro ao recuperar cliente selecionado do localStorage:', error);
     }
-    console.log('🔍 DEBUG: Nenhum cliente selecionado no localStorage');
     return null;
   });
   const [inputWarning, setInputWarning] = useState('');
@@ -917,6 +920,13 @@ const AIPage = () => {
       
       // Adicionar log para debug
       console.log('🔍 DEBUG: Enviando requisição com cliente selecionado:', clienteSelecionado);
+      if (clienteSelecionado) {
+        console.log('🔍 DEBUG: Cliente selecionado detalhes:', {
+          id: clienteSelecionado.id,
+          nome: clienteSelecionado.nomeCompleto,
+          telefone: clienteSelecionado.telefone
+        });
+      }
       
       // Adicionar NLP se disponível
       if (mensagemEnriquecida) {
@@ -1098,8 +1108,10 @@ const AIPage = () => {
           
           // Armazenar também no localStorage para persistência
           try {
-            localStorage.setItem('clienteSelecionado', JSON.stringify(data.cliente));
+            const clienteString = JSON.stringify(data.cliente);
+            localStorage.setItem('clienteSelecionado', clienteString);
             console.log('🔍 DEBUG: Cliente selecionado salvo no localStorage:', data.cliente);
+            console.log('🔍 DEBUG: Cliente JSON string:', clienteString.substring(0, 100) + '...');
           } catch (error) {
             console.error('❌ Erro ao salvar cliente selecionado no localStorage:', error);
           }

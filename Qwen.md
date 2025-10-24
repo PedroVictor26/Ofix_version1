@@ -239,4 +239,4 @@ The project includes:
 
 sempre fale em portugues
 
-quando terminar alterações pergunte se quer que suba para o github
+quando terminar alterações so suba para o github se alterar o backend
