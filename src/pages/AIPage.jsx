@@ -884,6 +884,9 @@ const AIPage = () => {
         cliente_selecionado: clienteSelecionado  // ✅ Envia cliente selecionado
       };
       
+      // Adicionar log para debug
+      console.log('🔍 DEBUG: Enviando requisição com cliente selecionado:', clienteSelecionado);
+      
       // Adicionar NLP se disponível
       if (mensagemEnriquecida) {
         requestBody.nlp = mensagemEnriquecida.nlp;
