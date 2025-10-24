@@ -590,6 +590,13 @@ const AIPage = () => {
 
   const enviarMensagem = async () => {
     if (!mensagem.trim() || carregando) return;
+    
+    // Log para debug do estado antes de enviar
+    console.log('🔍 DEBUG: Estado antes de enviar mensagem:', {
+      contextoAtivo: contextoAtivo,
+      clienteSelecionado: clienteSelecionado,
+      mensagem: mensagem
+    });
 
     // Verificar se estamos no contexto de busca de cliente e a mensagem é um número
     if (contextoAtivo === 'buscar_cliente' && /^\d+$/.test(mensagem.trim())) {
@@ -1062,8 +1069,16 @@ const AIPage = () => {
         
         // Atualizar cliente selecionado se for uma seleção
         if (tipoResposta === 'cliente_selecionado' && data.cliente) {
+          console.log('🔍 DEBUG: Atualizando cliente selecionado:', data.cliente);
           setClienteSelecionado(data.cliente);
         }
+        
+        // Log para debug do estado atual
+        console.log('🔍 DEBUG: Estado após processamento:', {
+          contextoAtivo: contextoAtivo,
+          clienteSelecionado: clienteSelecionado,
+          tipoResposta: tipoResposta
+        });
 
         // Falar resposta se voz habilitada
         if (vozHabilitada && responseContent && 'speechSynthesis' in window) {
