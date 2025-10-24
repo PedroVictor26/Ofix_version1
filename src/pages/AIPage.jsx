@@ -1071,6 +1071,12 @@ const AIPage = () => {
         if (tipoResposta === 'cliente_selecionado' && data.cliente) {
           console.log('🔍 DEBUG: Atualizando cliente selecionado:', data.cliente);
           setClienteSelecionado(data.cliente);
+          
+          // Forçar atualização do contexto também para garantir sincronização
+          setContextoAtivo('cliente_selecionado');
+          
+          // Log imediato para verificar atualização
+          console.log('🔍 DEBUG: Cliente selecionado atualizado para:', data.cliente);
         }
         
         // Log para debug do estado atual
@@ -1079,6 +1085,13 @@ const AIPage = () => {
           clienteSelecionado: clienteSelecionado,
           tipoResposta: tipoResposta
         });
+        
+        // Verificação especial para cliente selecionado
+        if (tipoResposta === 'cliente_selecionado' && data.cliente) {
+          setTimeout(() => {
+            console.log('🔍 DEBUG: Verificação após timeout - cliente selecionado:', clienteSelecionado);
+          }, 100);
+        }
 
         // Falar resposta se voz habilitada
         if (vozHabilitada && responseContent && 'speechSynthesis' in window) {
