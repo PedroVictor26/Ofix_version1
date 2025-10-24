@@ -54,12 +54,13 @@ const AIPage = () => {
     try {
       const clienteSalvo = localStorage.getItem('clienteSelecionado');
       if (clienteSalvo) {
-        console.log('🔍 DEBUG: Cliente selecionado recuperado do localStorage');
+        console.log('🔍 DEBUG: Cliente selecionado recuperado do localStorage:', JSON.parse(clienteSalvo));
         return JSON.parse(clienteSalvo);
       }
     } catch (error) {
       console.error('❌ Erro ao recuperar cliente selecionado do localStorage:', error);
     }
+    console.log('🔍 DEBUG: Nenhum cliente selecionado no localStorage');
     return null;
   });
   const [inputWarning, setInputWarning] = useState('');
@@ -1098,7 +1099,7 @@ const AIPage = () => {
           // Armazenar também no localStorage para persistência
           try {
             localStorage.setItem('clienteSelecionado', JSON.stringify(data.cliente));
-            console.log('🔍 DEBUG: Cliente selecionado salvo no localStorage');
+            console.log('🔍 DEBUG: Cliente selecionado salvo no localStorage:', data.cliente);
           } catch (error) {
             console.error('❌ Erro ao salvar cliente selecionado no localStorage:', error);
           }
