@@ -448,6 +448,36 @@ router.get('/historico-conversa', async (req, res) => {
 
 async function processarAgendamento(mensagem, usuario_id, cliente_selecionado = null) {
     try {
+        console.log('🔍 DEBUG AGENDAMENTO:');
+        console.log('   - Mensagem recebida:', mensagem);
+        console.log('   - Usuario ID:', usuario_id);
+        console.log('   - Cliente selecionado:', cliente_selecionado);
+        
+        // Verificação específica para quando cliente está selecionado e mensagem é "agendar"
+        const mensagemNormalizada = mensagem ? mensagem.trim().toLowerCase() : '';
+        console.log('   - Mensagem normalizada:', mensagemNormalizada);
+        
+        if (cliente_selecionado && (mensagemNormalizada === 'agendar' || mensagemNormalizada === 'agende' || mensagemNormalizada === 'agendar serviço')) {
+            console.log('   ✅ Cliente selecionado e mensagem de agendamento detectada');
+            return {
+                success: false,
+                response: `📋 **Agendamento para ${cliente_selecionado.nomeCompleto}**\n\n` +
+                         `💡 **Me informe os dados restantes:**\n\n` +
+                         `• **Serviço:** Tipo de manutenção (revisão, troca de óleo, etc)\n` +
+                         `• **Dia:** Dia da semana ou data (segunda, terça, 20/10)\n` +
+                         `• **Horário:** Hora desejada (14h, 16:00)\n\n` +
+                         `**Exemplo:**\n` +
+                         `"Revisão na segunda às 14h" ou "Troca de óleo amanhã às 10h"`,
+                tipo: 'pergunta',
+                cliente_selecionado: cliente_selecionado,
+                faltando: [
+                    '• **Serviço:** Tipo de manutenção (revisão, troca de óleo, etc)',
+                    '• **Dia:** Dia da semana ou data (segunda, terça, 20/10)',
+                    '• **Horário:** Hora desejada (14h, 16:00)'
+                ]
+            };
+        }
+
         // 0. BUSCAR OFICINA DO USUÁRIO
         let oficinaId = null;
         if (usuario_id) {
