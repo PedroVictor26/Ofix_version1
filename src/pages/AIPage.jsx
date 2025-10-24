@@ -49,9 +49,32 @@ const AIPage = () => {
 
   // ✅ NOVOS ESTADOS - Melhorias Críticas para Busca de Clientes
   const [contextoAtivo, setContextoAtivo] = useState(null);
-  const [clienteSelecionado, setClienteSelecionado] = useState(null);
+  const [clienteSelecionado, setClienteSelecionado] = useState(() => {
+    // Tentar recuperar do localStorage ao iniciar
+    try {
+      const clienteSalvo = localStorage.getItem('clienteSelecionado');
+      if (clienteSalvo) {
+        console.log('🔍 DEBUG: Cliente selecionado recuperado do localStorage');
+        return JSON.parse(clienteSalvo);
+      }
+    } catch (error) {
+      console.error('❌ Erro ao recuperar cliente selecionado do localStorage:', error);
+    }
+    return null;
+  });
   const [inputWarning, setInputWarning] = useState('');
   const [inputHint, setInputHint] = useState('');
+
+  // Função para limpar o cliente selecionado
+  const limparClienteSelecionado = useCallback(() => {
+    setClienteSelecionado(null);
+    try {
+      localStorage.removeItem('clienteSelecionado');
+      console.log('🔍 DEBUG: Cliente selecionado removido do localStorage');
+    } catch (error) {
+      console.error('❌ Erro ao remover cliente selecionado do localStorage:', error);
+    }
+  }, []);
 
   // Estados para funcionalidades de voz
   const [gravando, setGravando] = useState(false);
@@ -1071,6 +1094,14 @@ const AIPage = () => {
         if (tipoResposta === 'cliente_selecionado' && data.cliente) {
           console.log('🔍 DEBUG: Atualizando cliente selecionado:', data.cliente);
           setClienteSelecionado(data.cliente);
+          
+          // Armazenar também no localStorage para persistência
+          try {
+            localStorage.setItem('clienteSelecionado', JSON.stringify(data.cliente));
+            console.log('🔍 DEBUG: Cliente selecionado salvo no localStorage');
+          } catch (error) {
+            console.error('❌ Erro ao salvar cliente selecionado no localStorage:', error);
+          }
           
           // Forçar atualização do contexto também para garantir sincronização
           setContextoAtivo('cliente_selecionado');
