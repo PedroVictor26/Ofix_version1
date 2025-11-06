@@ -19,6 +19,10 @@ const AGNO_API_TOKEN = process.env.AGNO_API_TOKEN || '';
 const contextoSelecaoClientes = new Map(); // { usuarioId: { clientes: [...], timestamp: Date } }
 const TEMPO_EXPIRACAO = 10 * 60 * 1000; // 10 minutos
 
+// Cache de warming do Agno
+let agnoWarmed = false;
+let lastWarmingAttempt = null;
+
 // Registro de context e knowledge para o Agno
 const AGNO_CONTEXT = {
     name: "OFIX - Sistema de Oficina Automotiva",
@@ -48,6 +52,8 @@ router.get('/config', async (req, res) => {
             agno_url: AGNO_API_URL,
             has_token: !!AGNO_API_TOKEN,
             agent_id: process.env.AGNO_DEFAULT_AGENT_ID || 'oficinaia',
+            warmed: agnoWarmed,
+            last_warming: lastWarmingAttempt ? new Date(lastWarmingAttempt).toISOString() : null,
             timestamp: new Date().toISOString(),
             status: AGNO_API_URL === 'http://localhost:8000' ? 'development' : 'production'
         });
@@ -55,6 +61,30 @@ router.get('/config', async (req, res) => {
         console.error('❌ Erro ao verificar configuração:', error.message);
         res.status(500).json({
             error: 'Erro ao verificar configuração',
+            message: error.message
+        });
+    }
+});
+
+// Endpoint para aquecer o serviço Agno (útil para evitar cold starts)
+router.post('/warm', async (req, res) => {
+    try {
+        console.log('🔥 Requisição de warming do Agno...');
+        
+        const success = await warmAgnoService();
+        
+        res.json({
+            success: success,
+            warmed: agnoWarmed,
+            agno_url: AGNO_API_URL,
+            message: success ? 'Serviço Agno aquecido com sucesso' : 'Falha ao aquecer serviço Agno',
+            timestamp: new Date().toISOString()
+        });
+    } catch (error) {
+        console.error('❌ Erro ao aquecer Agno:', error.message);
+        res.status(500).json({
+            success: false,
+            error: 'Erro ao aquecer serviço',
             message: error.message
         });
     }
@@ -257,28 +287,41 @@ router.post('/chat-inteligente', async (req, res) => {
                 console.log('   🤖 Chamando Agno AI para', intencao);
                 response = await chamarAgnoAI(message, usuario_id, intencao, nlp);
             } catch (agnoError) {
-                console.error('   ⚠️ Agno falhou, usando fallback:', agnoError.message);
+                const isTimeout = agnoError.message.includes('timeout');
+                const errorType = isTimeout ? '⏱️ Timeout' : '❌ Erro';
+                console.error(`   ⚠️ Agno falhou (${errorType}), usando fallback:`, agnoError.message);
+                
                 // Fallback para resposta local
                 if (intencao === 'CONSULTA_PRECO') {
                     const servico = nlp?.entidades?.servico || 'serviço';
+                    const fallbackMessage = isTimeout 
+                        ? `💰 **Consulta de Preço - ${servico}**\n\n⚠️ _O assistente avançado está iniciando (pode levar até 50 segundos no primeiro acesso). Você receberá uma resposta mais detalhada em breve._\n\n**Por enquanto:**\nPara fornecer um orçamento preciso, preciso de algumas informações:\n\n• Qual é o modelo do veículo?\n• Qual ano?\n\nOs valores variam dependendo do veículo. Entre em contato para um orçamento personalizado!\n\n📞 **Contato:** (11) 1234-5678`
+                        : `💰 **Consulta de Preço - ${servico}**\n\nPara fornecer um orçamento preciso, preciso de algumas informações:\n\n• Qual é o modelo do veículo?\n• Qual ano?\n\nOs valores variam dependendo do veículo. Entre em contato para um orçamento personalizado!\n\n📞 **Contato:** (11) 1234-5678`;
+                    
                     response = {
                         success: true,
-                        response: `💰 **Consulta de Preço - ${servico}**\n\nPara fornecer um orçamento preciso, preciso de algumas informações:\n\n• Qual é o modelo do veículo?\n• Qual ano?\n\nOs valores variam dependendo do veículo. Entre em contato para um orçamento personalizado!\n\n📞 **Contato:** (11) 1234-5678`,
+                        response: fallbackMessage,
                         tipo: 'consulta_preco',
                         mode: 'fallback',
                         agno_error: agnoError.message,
+                        is_timeout: isTimeout,
                         metadata: {
                             servico: servico,
                             intencao_detectada: 'consulta_preco'
                         }
                     };
                 } else {
+                    const fallbackMessage = isTimeout
+                        ? `${NLPService.gerarMensagemAjuda()}\n\n_⚠️ O assistente avançado está iniciando. Tente novamente em alguns instantes para respostas mais detalhadas._`
+                        : NLPService.gerarMensagemAjuda();
+                    
                     response = {
                         success: true,
-                        response: NLPService.gerarMensagemAjuda(),
+                        response: fallbackMessage,
                         tipo: 'ajuda',
                         mode: 'fallback',
-                        agno_error: agnoError.message
+                        agno_error: agnoError.message,
+                        is_timeout: isTimeout
                     };
                 }
             }
@@ -1931,11 +1974,62 @@ LEMBRE-SE: DADOS ENCONTRADOS = RESPOSTA EXATA. NUNCA substitua dados específico
 });
 
 // ============================================================
-// 🤖 FUNÇÃO AUXILIAR: CHAMAR AGNO AI
+// 🤖 FUNÇÕES AUXILIARES: AGNO AI
 // ============================================================
+
+/**
+ * Acordar o serviço Agno (cold start no Render pode levar até 50s)
+ */
+async function warmAgnoService() {
+    if (!AGNO_API_URL || AGNO_API_URL === 'http://localhost:8000') {
+        return false;
+    }
+
+    // Evitar múltiplas tentativas simultâneas
+    const now = Date.now();
+    if (lastWarmingAttempt && (now - lastWarmingAttempt) < 60000) { // 1 minuto
+        return agnoWarmed;
+    }
+
+    lastWarmingAttempt = now;
+
+    try {
+        console.log('🔥 Aquecendo serviço Agno...');
+        
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 segundos para warming
+        
+        const response = await fetch(`${AGNO_API_URL}/health`, {
+            method: 'GET',
+            signal: controller.signal
+        });
+        
+        clearTimeout(timeoutId);
+        
+        agnoWarmed = response.ok;
+        
+        if (agnoWarmed) {
+            console.log('✅ Serviço Agno aquecido e pronto!');
+        } else {
+            console.log('⚠️ Serviço Agno respondeu mas não está healthy');
+        }
+        
+        return agnoWarmed;
+    } catch (error) {
+        console.log('⚠️ Não foi possível aquecer o serviço Agno:', error.message);
+        agnoWarmed = false;
+        return false;
+    }
+}
 
 async function chamarAgnoAI(message, usuario_id, intencao, nlp) {
     console.log('   🔌 Conectando com Agno AI...');
+
+    // Tentar aquecer o serviço se não estiver warm
+    if (!agnoWarmed) {
+        console.log('   ⏳ Agno não está aquecido, tentando warming...');
+        await warmAgnoService();
+    }
 
     // Preparar contexto rico para o Agno
     const contexto = {
@@ -1945,42 +2039,81 @@ async function chamarAgnoAI(message, usuario_id, intencao, nlp) {
         periodo: nlp?.periodo || null
     };
 
-    const agnoResponse = await fetch(`${AGNO_API_URL}/chat`, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            ...(AGNO_API_TOKEN && { 'Authorization': `Bearer ${AGNO_API_TOKEN}` })
-        },
-        body: JSON.stringify({
-            message: message,
-            user_id: usuario_id || 'anonymous',
-            context: contexto
-        }),
-        timeout: 15000 // 15 segundos
-    });
+    // Tentar até 2 vezes (primeira pode falhar por cold start)
+    let lastError;
+    const maxRetries = 2;
 
-    if (!agnoResponse.ok) {
-        throw new Error(`Agno retornou status ${agnoResponse.status}`);
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        if (attempt > 1) {
+            console.log(`   🔄 Tentativa ${attempt}/${maxRetries}...`);
+        }
+
+        // Implementar timeout manualmente (node-fetch não suporta timeout nativo)
+        const controller = new AbortController();
+        const timeoutMs = attempt === 1 ? 45000 : 30000; // Primeira tentativa: 45s (cold start), depois: 30s
+        const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+        try {
+            const agnoResponse = await fetch(`${AGNO_API_URL}/chat`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...(AGNO_API_TOKEN && { 'Authorization': `Bearer ${AGNO_API_TOKEN}` })
+                },
+                body: JSON.stringify({
+                    message: message,
+                    user_id: usuario_id || 'anonymous',
+                    context: contexto
+                }),
+                signal: controller.signal
+            });
+
+            clearTimeout(timeoutId);
+
+            if (!agnoResponse.ok) {
+                throw new Error(`Agno retornou status ${agnoResponse.status}`);
+            }
+
+            const agnoData = await agnoResponse.json();
+            const agnoContent = agnoData.response || agnoData.content || agnoData.message || 'Resposta do Agno';
+
+            console.log('   ✅ Resposta do Agno recebida');
+            agnoWarmed = true; // Marcar como aquecido após sucesso
+
+            return {
+                success: true,
+                response: agnoContent,
+                tipo: intencao.toLowerCase(),
+                mode: 'production',
+                agno_configured: true,
+                metadata: {
+                    intencao_detectada: intencao,
+                    agno_response: true,
+                    entidades: nlp?.entidades,
+                    attempts: attempt,
+                    ...agnoData
+                }
+            };
+        } catch (error) {
+            clearTimeout(timeoutId);
+            lastError = error;
+
+            if (error.name === 'AbortError') {
+                console.log(`   ⏱️ Timeout na tentativa ${attempt} (${timeoutMs}ms)`);
+                lastError = new Error(`timeout - Agno AI não respondeu em ${timeoutMs/1000}s (possível cold start)`);
+            } else {
+                console.log(`   ❌ Erro na tentativa ${attempt}:`, error.message);
+            }
+
+            // Se não for a última tentativa, aguardar um pouco antes de tentar novamente
+            if (attempt < maxRetries) {
+                await new Promise(resolve => setTimeout(resolve, 2000)); // 2 segundos
+            }
+        }
     }
 
-    const agnoData = await agnoResponse.json();
-    const agnoContent = agnoData.response || agnoData.content || agnoData.message || 'Resposta do Agno';
-
-    console.log('   ✅ Resposta do Agno recebida');
-
-    return {
-        success: true,
-        response: agnoContent,
-        tipo: intencao.toLowerCase(),
-        mode: 'production',
-        agno_configured: true,
-        metadata: {
-            intencao_detectada: intencao,
-            agno_response: true,
-            entidades: nlp?.entidades,
-            ...agnoData
-        }
-    };
+    // Se chegou aqui, todas as tentativas falharam
+    throw lastError;
 }
 
 export default router;

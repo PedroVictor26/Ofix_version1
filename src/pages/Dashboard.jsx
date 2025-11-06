@@ -17,6 +17,9 @@ import StatsCards, {
   StatsCardSkeleton,
 } from "@/components/dashboard/StatsCards";
 import KanbanBoard from "@/components/dashboard/KanbanBoard";
+import KanbanMobileList from "@/components/dashboard/KanbanMobileList";
+import { useIsMobile } from "@/hooks/use-mobile";
+import useDebounce from "@/hooks/useDebounce";
 import ServiceModal from "@/components/dashboard/ServiceModal";
 import NewServiceModal from "@/components/dashboard/NewServiceModal";
 import * as servicosService from "../services/servicos.service.js";
@@ -41,6 +44,7 @@ const ErrorState = ({ error, onRetry }) => (
 );
 
 export default function Dashboard() {
+  const isMobile = useIsMobile();
   const { servicos, clientes, veiculos, isLoading, error, reload } =
     useDashboardData();
   const [localServicos, setLocalServicos] = useState([]);
@@ -48,19 +52,20 @@ export default function Dashboard() {
   const [isServiceModalOpen, setServiceModalOpen] = useState(false);
   const [isNewServiceModalOpen, setNewServiceModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
+  const debouncedSearchTerm = useDebounce(searchTerm, 300);
   const [filteredServicos, setFilteredServicos] = useState([]);
 
   useEffect(() => {
     setLocalServicos(servicos || []);
   }, [servicos]);
 
-  // Função de busca inteligente
+  // Função de busca inteligente com debounce
   const performSearch = useMemo(() => {
-    if (!searchTerm.trim()) {
+    if (!debouncedSearchTerm.trim()) {
       return localServicos;
     }
 
-    const term = searchTerm.toLowerCase().trim();
+    const term = debouncedSearchTerm.toLowerCase().trim();
     
     return localServicos.filter((servico) => {
       // Buscar por número da OS
@@ -85,7 +90,7 @@ export default function Dashboard() {
       
       return false;
     });
-  }, [localServicos, searchTerm, clientes, veiculos]);
+  }, [localServicos, debouncedSearchTerm, clientes, veiculos]);
 
   // Atualizar serviços filtrados
   useEffect(() => {
@@ -221,7 +226,7 @@ export default function Dashboard() {
                 <Button
                   onClick={() => setNewServiceModalOpen(true)}
                   size="lg"
-                  className="bg-blue-600 hover:bg-blue-700"
+                  className="bg-blue-600 hover:bg-blue-700 min-h-[48px] touch-manipulation"
                 >
                   <Plus className="w-5 h-5 mr-2" />
                   Nova Ordem de Serviço
@@ -297,24 +302,35 @@ export default function Dashboard() {
             )}
           </section>
 
-          {/* Kanban Board */}
+          {/* Kanban Board / Mobile List */}
           <main>
-            <KanbanBoard
-              servicos={filteredServicos}
-              clientes={clientes}
-              veiculos={veiculos}
-              onServiceClick={(service) => {
-                console.log("Dashboard - Service clicado:", service);
-                if (service && service.id) {
-                  setSelectedService(service);
-                  setServiceModalOpen(true);
-                } else {
-                  console.error("Dashboard - Service inválido:", service);
-                }
-              }}
-              statusConfig={statusConfig}
-              isLoading={isLoading}
-            />
+            {isMobile ? (
+              <KanbanMobileList
+                servicos={filteredServicos}
+                clientes={clientes}
+                veiculos={veiculos}
+                onServiceClick={(service) => {
+                  if (service && service.id) {
+                    setSelectedService(service);
+                    setServiceModalOpen(true);
+                  }
+                }}
+              />
+            ) : (
+              <KanbanBoard
+                servicos={filteredServicos}
+                clientes={clientes}
+                veiculos={veiculos}
+                onServiceClick={(service) => {
+                  if (service && service.id) {
+                    setSelectedService(service);
+                    setServiceModalOpen(true);
+                  }
+                }}
+                statusConfig={statusConfig}
+                isLoading={isLoading}
+              />
+            )}
           </main>
         </div>
       </div>

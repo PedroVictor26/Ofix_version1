@@ -32,6 +32,7 @@ import {
     SidebarTrigger,
 } from "@/components/ui/sidebar";
 import { Toaster } from 'react-hot-toast';
+import toast from 'react-hot-toast';
 import VirtualAssistant from './components/ai/VirtualAssistant.jsx';
 
 // --- Constantes ---
@@ -241,8 +242,36 @@ export default function Layout() {
         return 'cliente';
     }, [user?.role]);
 
+    // Atalhos de teclado globais
+    useEffect(() => {
+        const handleKeyDown = (e) => {
+            // Alt + M: Abrir Matias
+            if (e.altKey && e.key.toLowerCase() === 'm') {
+                e.preventDefault();
+                if (location.pathname !== '/assistente-ia') {
+                    window.location.href = '/assistente-ia';
+                }
+            }
+            // Alt + H: Mostrar atalhos (Help)
+            if (e.altKey && e.key.toLowerCase() === 'h') {
+                e.preventDefault();
+                toast(
+                    <div className="text-sm">
+                        <p className="font-bold mb-2">⌨️ Atalhos Disponíveis:</p>
+                        <p><kbd className="px-2 py-1 bg-slate-200 rounded text-xs">Alt+M</kbd> Abrir Matias</p>
+                        <p><kbd className="px-2 py-1 bg-slate-200 rounded text-xs">Alt+H</kbd> Mostrar atalhos</p>
+                    </div>,
+                    { duration: 4000 }
+                );
+            }
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [location.pathname]);
+
     return (
-        <SidebarProvider>
+        <SidebarProvider defaultOpen={true}>
             <Toaster
                 position="top-right"
                 reverseOrder={false}
@@ -542,6 +571,23 @@ export default function Layout() {
                     }}
                 />
             )} */}
+
+            {/* Botão Flutuante Matias */}
+            {isAuthenticated && location.pathname !== '/assistente-ia' && (
+                <Link
+                    to="/assistente-ia"
+                    className="fixed bottom-6 right-6 w-14 h-14 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 rounded-full shadow-lg flex items-center justify-center z-40 transition-all duration-300 hover:scale-110 group"
+                    aria-label="Abrir Assistente Matias"
+                >
+                    <Brain className="w-6 h-6 text-white" />
+                    <span className="absolute -top-2 -right-2 w-6 h-6 bg-green-500 rounded-full border-2 border-white flex items-center justify-center">
+                        <span className="w-2 h-2 bg-white rounded-full animate-pulse"></span>
+                    </span>
+                    <div className="absolute bottom-full mb-2 right-0 bg-slate-900 text-white text-xs px-3 py-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
+                        Matias IA (Alt+M)
+                    </div>
+                </Link>
+            )}
 
             {/* Modal de Estoque Baixo - Overlay Global */}
             {showEstoqueBaixoModal && (
