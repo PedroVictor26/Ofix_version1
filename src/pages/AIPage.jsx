@@ -148,7 +148,7 @@ const AIPage = () => {
           if (data.success && data.mensagens?.length > 0) {
             const mensagensFormatadas = data.mensagens.map(msg => ({
               id: msg.id || Date.now(),
-              tipo: msg.tipo_remetente === 'usuario' ? 'usuario' : 'agente',
+              tipo: msg.tipo_remetente === 'user' ? 'usuario' : 'agente',
               conteudo: msg.conteudo,
               timestamp: msg.timestamp
             }));
