@@ -440,11 +440,11 @@ router.get('/historico-conversa', async (req, res) => {
 
         // Buscar conversa mais recente do usuário
         const conversa = await prisma.conversaMatias.findFirst({
-            where: { usuarioId: usuarioIdInt },
-            orderBy: { criadoEm: 'desc' },
+            where: { userId: usuarioIdInt },
+            orderBy: { createdAt: 'desc' },
             include: {
                 mensagens: {
-                    orderBy: { criadoEm: 'asc' },
+                    orderBy: { createdAt: 'asc' },
                     take: 50 // Últimas 50 mensagens
                 }
             }
@@ -461,9 +461,9 @@ router.get('/historico-conversa', async (req, res) => {
         // Formatar mensagens
         const mensagensFormatadas = conversa.mensagens.map(msg => ({
             id: msg.id,
-            tipo_remetente: msg.tipoRemetente,
+            tipo_remetente: msg.tipo,
             conteudo: msg.conteudo,
-            timestamp: msg.criadoEm
+            timestamp: msg.createdAt
         }));
 
         console.log(`✅ Histórico retornado: ${mensagensFormatadas.length} mensagens`);
