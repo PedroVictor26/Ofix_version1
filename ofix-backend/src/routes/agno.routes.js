@@ -384,7 +384,7 @@ router.post('/chat-inteligente', async (req, res) => {
                     if (message.toLowerCase().includes('agendar') && req.body.cliente_selecionado) {
                         response = await processarAgendamento(message, usuario_id, req.body.cliente_selecionado);
                     } else {
-                        response = await processarConversaGeral(message);
+                        response = await processarConversaGeral(message, usuario_id);
                     }
                     break;
             }
@@ -1225,13 +1225,41 @@ async function processarConsultaCliente(mensagem, contexto_ativo = null, usuario
 // 💬 FUNÇÃO: PROCESSAR CONVERSA GERAL
 // ============================================================================
 
-async function processarConversaGeral(mensagem) {
-    // Se Agno estiver configurado, enviar para lá
-    // Senão, resposta genérica
+async function processarConversaGeral(mensagem, usuario_id = null) {
+    // 🤖 Se Agno estiver configurado, SEMPRE tentar chamar
+    if (AGNO_API_URL && AGNO_API_URL !== 'http://localhost:8000') {
+        try {
+            console.log('   🤖 Chamando Agno AI para conversa geral');
+            const agnoResponse = await chamarAgnoAI(mensagem, usuario_id, 'CONVERSA_GERAL', null);
+            return agnoResponse;
+        } catch (agnoError) {
+            const isTimeout = agnoError.message.includes('timeout');
+            const errorType = isTimeout ? '⏱️ Timeout' : '❌ Erro';
+            console.error(`   ⚠️ Agno falhou (${errorType}), usando fallback:`, agnoError.message);
+            
+            // Fallback: resposta genérica com informação sobre o erro
+            const fallbackMessage = isTimeout 
+                ? `🤖 **Assistente Matias**\n\n⚠️ _O assistente avançado está iniciando (pode levar até 50 segundos no primeiro acesso)._\n\nEnquanto isso, como posso ajudar?\n\n💡 Digite "ajuda" para ver o que posso fazer!`
+                : `🤖 **Assistente Matias**\n\nComo posso ajudar?\n\n💡 Digite "ajuda" para ver o que posso fazer!`;
+            
+            return {
+                success: true,
+                response: fallbackMessage,
+                tipo: 'conversa',
+                mode: 'fallback',
+                agno_error: agnoError.message,
+                is_timeout: isTimeout
+            };
+        }
+    }
+    
+    // Senão, resposta genérica local
     return {
         success: true,
-        response: '🤖 **Assistente Matias**\n\nComo posso ajudar?\n\n💡 Digite "ajuda" para ver o que posso fazer.',
-        tipo: 'conversa'
+        response: '🤖 **Assistente Matias**\n\nComo posso ajudar?\n\n💡 Digite "ajuda" para ver o que posso fazer!',
+        tipo: 'conversa',
+        mode: 'local',
+        agno_configured: false
     };
 }
 
