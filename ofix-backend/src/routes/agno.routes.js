@@ -28,6 +28,34 @@ const TEMPO_EXPIRACAO = 10 * 60 * 1000; // 10 minutos
 let agnoWarmed = false;
 let lastWarmingAttempt = null;
 
+// ⚡ CIRCUIT BREAKER para Rate Limit (429)
+let circuitBreakerOpen = false;
+let circuitBreakerOpenUntil = null;
+const CIRCUIT_BREAKER_COOLDOWN = 60000; // 1 minuto de cooldown após 429
+
+function checkCircuitBreaker() {
+    if (circuitBreakerOpen) {
+        const now = Date.now();
+        if (now < circuitBreakerOpenUntil) {
+            const remainingSeconds = Math.ceil((circuitBreakerOpenUntil - now) / 1000);
+            console.log(`🚫 [CIRCUIT BREAKER] Agno AI bloqueado por ${remainingSeconds}s (rate limit)`);
+            return false; // Bloqueado
+        } else {
+            // Cooldown expirou, resetar
+            console.log('✅ [CIRCUIT BREAKER] Cooldown expirado, reativando Agno AI');
+            circuitBreakerOpen = false;
+            circuitBreakerOpenUntil = null;
+        }
+    }
+    return true; // Permitido
+}
+
+function openCircuitBreaker() {
+    circuitBreakerOpen = true;
+    circuitBreakerOpenUntil = Date.now() + CIRCUIT_BREAKER_COOLDOWN;
+    console.log(`🚫 [CIRCUIT BREAKER] Agno AI bloqueado por ${CIRCUIT_BREAKER_COOLDOWN / 1000}s (rate limit detectado)`);
+}
+
 // Registro de context e knowledge para o Agno
 const AGNO_CONTEXT = {
     name: "OFIX - Sistema de Oficina Automotiva",
@@ -1755,6 +1783,29 @@ async function processarAcaoLocal(message, actionType, userId, contexto_ativo) {
 async function processarComAgnoAI(message, userId, agentId = 'oficinaia', session_id = null) {
     console.log('🧠 [AGNO_AI] Conectando com Agno...');
 
+    // ⚡ Verificar Circuit Breaker
+    if (!checkCircuitBreaker()) {
+        // Circuit breaker aberto - retornar fallback local imediatamente
+        return {
+            success: true,
+            response: `🤖 **Processando sua solicitação...**\n\n` +
+                `Você disse: "${message}"\n\n` +
+                `💡 **Como posso ajudar:**\n` +
+                `• Agendar um serviço\n` +
+                `• Consultar ordem de serviço\n` +
+                `• Ver peças disponíveis\n` +
+                `• Tirar dúvidas técnicas\n\n` +
+                `📞 **Contato direto:** (11) 1234-5678\n\n` +
+                `_Digite sua solicitação específica ou "ajuda" para ver todas as opções_`,
+            tipo: 'circuit_breaker_fallback',
+            mode: 'local_fallback',
+            metadata: {
+                circuit_breaker_active: true,
+                timestamp: new Date().toISOString()
+            }
+        };
+    }
+
     // Preparar payload JSON
     const payload = {
         message: message,
@@ -1815,23 +1866,53 @@ async function processarComAgnoAI(message, userId, agentId = 'oficinaia', sessio
             const errorData = await response.text();
             console.error('❌ [AGNO_AI] Erro na resposta:', response.status, errorData);
 
+            // Se for 429 (rate limit), abrir circuit breaker e retornar fallback
+            if (response.status === 429) {
+                console.warn('⚠️ [AGNO_AI] Rate limit atingido - ativando circuit breaker');
+                openCircuitBreaker(); // Bloquear novas chamadas por 1 minuto
+                return {
+                    success: true,
+                    response: `🤖 **Diagnosticando seu problema...**\n\n` +
+                        `Você mencionou: "${message}"\n\n` +
+                        `💡 **Recomendações iniciais:**\n` +
+                        `• Para problemas com barulhos, é importante verificar a fonte do som\n` +
+                        `• Traga seu veículo para uma avaliação detalhada\n` +
+                        `• Nossa equipe pode fazer um diagnóstico completo\n\n` +
+                        `📞 **Contato:** (11) 1234-5678\n\n` +
+                        `_Ou agende um horário digitando "agendar"_`,
+                    tipo: 'diagnostico_fallback',
+                    mode: 'local_fallback',
+                    metadata: {
+                        rate_limited: true,
+                        status: 429,
+                        timestamp: new Date().toISOString()
+                    }
+                };
+            }
+
             throw new Error(`Agno AI retornou status ${response.status}: ${errorData}`);
         }
     } catch (error) {
         console.error('❌ [AGNO_AI] Erro ao comunicar:', error.message);
         
         // FALLBACK: Resposta local em caso de erro do Agno
-        return LocalResponse.formatarResposta(
-            `🤖 **Assistente Matias temporariamente indisponível**\n\n` +
-            `Sua mensagem: "${message}"\n\n` +
-            `⚠️ Estamos com problemas de conexão. Por favor, tente novamente em instantes.\n\n` +
-            `💡 **Enquanto isso, posso ajudar com:**\n` +
-            `• Agendamentos (digite "agendar")\n` +
-            `• Consulta de OS (digite "status da OS")\n` +
-            `• Ajuda (digite "ajuda")`,
-            'error',
-            { agno_error: error.message }
-        );
+        return {
+            success: true,
+            response: `🤖 **Assistente Matias temporariamente indisponível**\n\n` +
+                `Sua mensagem: "${message}"\n\n` +
+                `⚠️ Estamos processando muitas solicitações. Aguarde alguns instantes.\n\n` +
+                `💡 **Enquanto isso, posso ajudar com:**\n` +
+                `• Agendamentos (digite "agendar")\n` +
+                `• Consulta de OS (digite "status da OS")\n` +
+                `• Ver estoque (digite "tem peça X")\n` +
+                `• Ajuda (digite "ajuda")`,
+            tipo: 'error_fallback',
+            mode: 'local_fallback',
+            metadata: {
+                agno_error: error.message,
+                timestamp: new Date().toISOString()
+            }
+        };
     }
 }
 

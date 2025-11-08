@@ -97,7 +97,10 @@ class MessageClassifier {
           'fazendo barulho', 'barulho no', 'ruído', 'ruido', 'barulho estranho',
           'trepidando', 'trepida', 'vibração', 'vibracao', 'vibrando',
           'falhando', 'engasgando', 'o que pode ser', 'pode ser o que',
-          'luz do motor', 'painel acendeu', 'acendeu no painel'
+          'luz do motor', 'painel acendeu', 'acendeu no painel',
+          'rangendo', 'range', 'chiando', 'chia', 'guinchando', 'guincha',
+          'estalando', 'estala', 'batendo', 'bate', 'chocalho', 'chocalha',
+          'está diferente', 'esta diferente', 'anormal', 'esquisito'
         ],
         confidence: 0.85,
         description: 'Diagnóstico técnico de problemas'
@@ -166,7 +169,9 @@ class MessageClassifier {
     const problemWords = [
       'barulho', 'problema', 'defeito', 'falha', 'quebrou', 'parou',
       'luz acendeu', 'trepidando', 'vazamento', 'fumaça', 'fumaca',
-      'o que pode ser', 'ruído', 'ruido', 'vibrando', 'falhando', 'engasgando'
+      'o que pode ser', 'ruído', 'ruido', 'vibrando', 'falhando', 'engasgando',
+      'rangendo', 'range', 'chiando', 'chia', 'estranho', 'esquisito',
+      'não está normal', 'nao esta normal', 'diferente', 'anormal'
     ];
     
     const hasProblem = problemWords.some(word => messageLower.includes(word));
