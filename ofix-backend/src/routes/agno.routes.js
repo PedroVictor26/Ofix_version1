@@ -200,218 +200,122 @@ router.post('/chat-inteligente', async (req, res) => {
             });
         }
 
-        console.log('🎯 Chat Inteligente - Mensagem:', message.substring(0, 80) + '...');
-        console.log('🎯 Contexto ativo:', contexto_ativo);
+        console.log('💬 [CHAT-INTELIGENTE] Nova mensagem:', message.substring(0, 80) + '...');
         console.log('🎯 Usuario ID:', usuario_id);
+        console.log('🎯 Contexto ativo:', contexto_ativo);
 
-        // 🎯 USAR CONTEXTO ATIVO PARA SOBRESCREVER INTENÇÃO QUANDO APLICÁVEL
-        let intencao;
-        
-        // Se houver contexto ativo, priorizar isso sobre a detecção de intenções normais
-        if (contexto_ativo) {
-            console.log('   🎯 Usando contexto ativo:', contexto_ativo);
+        // ⭐ NOVA ARQUITETURA: Usar MessageClassifier
+        const classification = MessageClassifier.classify(message);
+        console.log('🎯 [CLASSIFIER] Resultado:', {
+            processor: classification.processor,
+            type: classification.type,
+            subtype: classification.subtype,
+            confidence: classification.confidence
+        });
+
+        // 2️⃣ ROTEAMENTO INTELIGENTE
+        let responseData;
+        const startTime = Date.now();
+
+        if (classification.processor === 'BACKEND_LOCAL') {
+            // ⚡ PROCESSA LOCALMENTE (rápido, confiável)
+            console.log('⚡ [BACKEND_LOCAL] Processando localmente...');
             
-            switch (contexto_ativo) {
-                case 'buscar_cliente':
-                    intencao = 'CONSULTA_CLIENTE';  // Forçar tratamento como busca de cliente
-                    break;
-                case 'agendar_servico':
-                    intencao = 'AGENDAMENTO';
-                    break;
-                case 'status_os':
-                    intencao = 'CONSULTA_OS';
-                    break;
-                case 'consultar_pecas':
-                    intencao = 'CONSULTA_ESTOQUE';
-                    break;
-                case 'calcular_orcamento':
-                    intencao = 'CONSULTA_PRECO';
-                    break;
-                default:
-                    // Se não for um contexto conhecido, usar detecção normal
-                    if (nlp && nlp.intencao) {
-                        console.log('   ✅ Usando NLP do frontend:', nlp.intencao, `(${(nlp.confianca * 100).toFixed(1)}%)`);
-                        
-                        // Mapear intenções do frontend para o backend
-                        const mapeamento = {
-                            'consulta_preco': 'CONSULTA_PRECO',
-                            'agendamento': 'AGENDAMENTO',
-                            'consulta_estoque': 'CONSULTA_ESTOQUE',
-                            'consulta_cliente': 'CONSULTA_CLIENTE',
-                            'consulta_os': 'CONSULTA_OS',
-                            'saudacao': 'AJUDA',
-                            'ajuda': 'AJUDA'
-                        };
+            responseData = await processarLocal(message, classification, usuario_id, contexto_ativo, req);
+            
+            const duration = Date.now() - startTime;
+            console.log(`✅ [BACKEND_LOCAL] Processado em ${duration}ms`);
+            
+            // Adiciona metadata
+            responseData.metadata = {
+                ...responseData.metadata,
+                processed_by: 'BACKEND_LOCAL',
+                processing_time_ms: duration,
+                classification: classification
+            };
 
-                        intencao = mapeamento[nlp.intencao] || NLPService.detectarIntencao(message);
-                    } else {
-                        // Fallback: usar NLP local
-                        console.log('   ⚠️ NLP do frontend não disponível, usando NLP local');
-                        intencao = NLPService.detectarIntencao(message);
-                    }
-            }
         } else {
-            // Fallback: usar NLP normal quando não houver contexto ativo
-            if (nlp && nlp.intencao) {
-                console.log('   ✅ Usando NLP do frontend:', nlp.intencao, `(${(nlp.confianca * 100).toFixed(1)}%)`);
-                
-                // Mapear intenções do frontend para o backend
-                const mapeamento = {
-                    'consulta_preco': 'CONSULTA_PRECO',
-                    'agendamento': 'AGENDAMENTO',
-                    'consulta_estoque': 'CONSULTA_ESTOQUE',
-                    'consulta_cliente': 'CONSULTA_CLIENTE',
-                    'consulta_os': 'CONSULTA_OS',
-                    'saudacao': 'AJUDA',
-                    'ajuda': 'AJUDA'
-                };
-
-                intencao = mapeamento[nlp.intencao] || NLPService.detectarIntencao(message);
-            } else {
-                // Fallback: usar NLP local
-                console.log('   ⚠️ NLP do frontend não disponível, usando NLP local');
-                intencao = NLPService.detectarIntencao(message);
-            }
-        }
-
-        console.log('   Intenção final:', intencao);
-
-        // 2. PROCESSAR BASEADO NA INTENÇÃO
-        let response;
-
-        console.log('   🎯 Intenção detectada:', intencao);
-        
-        // Verificar se há contexto ativo e se deve sobrepor a intenção
-        if (contexto_ativo) {
-            console.log('   🎯 Contexto ativo sobrescrevendo intenção:', contexto_ativo);
-        }
-
-        // 🤖 Para consultas de preço e ajuda, tentar chamar Agno primeiro
-        if ((intencao === 'CONSULTA_PRECO' || intencao === 'AJUDA') && AGNO_API_URL && AGNO_API_URL !== 'http://localhost:8000') {
+            // 🧠 ENVIA PARA AGNO AI (inteligente, conversacional)
+            console.log('🧠 [AGNO_AI] Enviando para Agno AI...');
+            
             try {
-                console.log('   🤖 Chamando Agno AI para', intencao);
-                response = await chamarAgnoAI(message, usuario_id, intencao, nlp);
+                responseData = await processarComAgnoAI(message, usuario_id, 'oficinaia', null);
+                
+                const duration = Date.now() - startTime;
+                console.log(`✅ [AGNO_AI] Processado em ${duration}ms`);
+                
+                // Adiciona metadata
+                if (responseData.metadata) {
+                    responseData.metadata.processed_by = 'AGNO_AI';
+                    responseData.metadata.processing_time_ms = duration;
+                    responseData.metadata.classification = classification;
+                }
             } catch (agnoError) {
-                const isTimeout = agnoError.message.includes('timeout');
-                const errorType = isTimeout ? '⏱️ Timeout' : '❌ Erro';
+                const isTimeout = agnoError.message.includes('timeout') || agnoError.message.includes('429');
+                const errorType = isTimeout ? '⏱️ Timeout/Rate Limit' : '❌ Erro';
                 console.error(`   ⚠️ Agno falhou (${errorType}), usando fallback:`, agnoError.message);
                 
-                // Fallback para resposta local
-                if (intencao === 'CONSULTA_PRECO') {
-                    const servico = nlp?.entidades?.servico || 'serviço';
-                    const fallbackMessage = isTimeout 
-                        ? `💰 **Consulta de Preço - ${servico}**\n\n⚠️ _O assistente avançado está iniciando (pode levar até 50 segundos no primeiro acesso). Você receberá uma resposta mais detalhada em breve._\n\n**Por enquanto:**\nPara fornecer um orçamento preciso, preciso de algumas informações:\n\n• Qual é o modelo do veículo?\n• Qual ano?\n\nOs valores variam dependendo do veículo. Entre em contato para um orçamento personalizado!\n\n📞 **Contato:** (11) 1234-5678`
-                        : `💰 **Consulta de Preço - ${servico}**\n\nPara fornecer um orçamento preciso, preciso de algumas informações:\n\n• Qual é o modelo do veículo?\n• Qual ano?\n\nOs valores variam dependendo do veículo. Entre em contato para um orçamento personalizado!\n\n📞 **Contato:** (11) 1234-5678`;
-                    
-                    response = {
+                // Fallback para resposta local baseado no subtipo
+                const duration = Date.now() - startTime;
+                
+                if (classification.subtype === 'ORCAMENTO' || classification.subtype === 'CONSULTA_PRECO') {
+                    responseData = {
                         success: true,
-                        response: fallbackMessage,
+                        response: `💰 **Consulta de Preço**\n\n${isTimeout ? '⚠️ _O assistente está temporariamente indisponível._\n\n' : ''}Para fornecer um orçamento preciso, preciso de algumas informações:\n\n• Qual é o modelo do veículo?\n• Qual ano?\n\nOs valores variam dependendo do veículo. Entre em contato para um orçamento personalizado!\n\n📞 **Contato:** (11) 1234-5678`,
                         tipo: 'consulta_preco',
                         mode: 'fallback',
-                        agno_error: agnoError.message,
-                        is_timeout: isTimeout,
                         metadata: {
-                            servico: servico,
-                            intencao_detectada: 'consulta_preco'
+                            processed_by: 'BACKEND_LOCAL_FALLBACK',
+                            processing_time_ms: duration,
+                            agno_error: agnoError.message,
+                            is_timeout: isTimeout,
+                            classification: classification
                         }
                     };
                 } else {
-                    const fallbackMessage = isTimeout
-                        ? `${NLPService.gerarMensagemAjuda()}\n\n_⚠️ O assistente avançado está iniciando. Tente novamente em alguns instantes para respostas mais detalhadas._`
-                        : NLPService.gerarMensagemAjuda();
-                    
-                    response = {
+                    // Fallback genérico
+                    responseData = {
                         success: true,
-                        response: fallbackMessage,
+                        response: `Olá! 👋\n\n${isTimeout ? '⚠️ _O assistente avançado está temporariamente indisponível._\n\n' : ''}Como posso ajudar você hoje?\n\n• Agendar um serviço\n• Consultar ordem de serviço\n• Ver peças em estoque\n• Cadastrar cliente\n• Ver estatísticas\n\nDigite sua solicitação!`,
                         tipo: 'ajuda',
                         mode: 'fallback',
-                        agno_error: agnoError.message,
-                        is_timeout: isTimeout
+                        metadata: {
+                            processed_by: 'BACKEND_LOCAL_FALLBACK',
+                            processing_time_ms: duration,
+                            agno_error: agnoError.message,
+                            is_timeout: isTimeout,
+                            classification: classification
+                        }
                     };
                 }
             }
-        } else {
-            // Processar localmente para outras intenções
-            console.log('   🔄 Processando localmente intenção:', intencao);
-            switch (intencao) {
-                case 'CONSULTA_PRECO':
-                    const servico = nlp?.entidades?.servico || 'serviço';
-                    response = {
-                        success: true,
-                        response: `💰 **Consulta de Preço - ${servico}**\n\nPara fornecer um orçamento preciso, preciso de algumas informações:\n\n• Qual é o modelo do veículo?\n• Qual ano?\n\nOs valores variam dependendo do veículo. Entre em contato para um orçamento personalizado!\n\n📞 **Contato:** (11) 1234-5678`,
-                        tipo: 'consulta_preco',
-                        mode: 'local',
-                        agno_configured: false,
-                        metadata: {
-                            servico: servico,
-                            intencao_detectada: 'consulta_preco'
-                        }
-                    };
-                    break;
-
-                case 'AGENDAMENTO':
-                    response = await processarAgendamento(message, usuario_id, req.body.cliente_selecionado);
-                    break;
-
-                case 'CONSULTA_OS':
-                    response = await processarConsultaOS(message);
-                    break;
-
-                case 'CONSULTA_ESTOQUE':
-                    response = await processarConsultaEstoque(message);
-                    break;
-
-                case 'ESTATISTICAS':
-                    response = await processarEstatisticas(message);
-                    break;
-
-                case 'CONSULTA_CLIENTE':
-                    console.log('🔍 Chamando processarConsultaCliente com:', { message, contexto_ativo, usuario_id });
-                    response = await processarConsultaCliente(message, contexto_ativo, usuario_id);
-                    console.log('🔍 Resposta de processarConsultaCliente:', response);
-                    break;
-
-                case 'CADASTRAR_CLIENTE':
-                    response = await processarCadastroCliente(message, usuario_id);
-                    break;
-
-                case 'AJUDA':
-                    response = {
-                        success: true,
-                        response: NLPService.gerarMensagemAjuda(),
-                        tipo: 'ajuda'
-                    };
-                    break;
-
-                default:
-                    // Conversa geral - pode enviar para Agno Agent se configurado
-                    // MAS: Se a mensagem for 'agendar' e houver cliente selecionado, forçar AGENDAMENTO
-                    if (message.toLowerCase().includes('agendar') && req.body.cliente_selecionado) {
-                        response = await processarAgendamento(message, usuario_id, req.body.cliente_selecionado);
-                    } else {
-                        response = await processarConversaGeral(message, usuario_id);
-                    }
-                    break;
-            }
         }
 
-        // 3. SALVAR CONVERSA NO HISTÓRICO
+        // 3️⃣ SALVAR CONVERSA NO BANCO
         try {
             if (usuario_id) {
                 await ConversasService.salvarConversa({
                     usuarioId: usuario_id,
                     pergunta: message,
-                    resposta: response.response || 'Sem resposta',
-                    contexto: JSON.stringify({ intencao, contexto_ativo, ...response.metadata }),
+                    resposta: responseData.response || 'Sem resposta',
+                    contexto: JSON.stringify({ 
+                        classification: classification,
+                        contexto_ativo, 
+                        ...responseData.metadata 
+                    }),
                     timestamp: new Date()
                 });
+                console.log('✅ Mensagem salva no histórico');
             }
         } catch (saveError) {
             console.error('⚠️ Erro ao salvar conversa (não crítico):', saveError.message);
         }
 
-        // 4. RETORNAR RESPOSTA
-        return res.json(response);
+        // 4️⃣ RETORNAR RESPOSTA
+        return res.json({
+            success: true,
+            ...responseData
+        });
 
     } catch (error) {
         console.error('❌ Erro no chat inteligente:', error);
