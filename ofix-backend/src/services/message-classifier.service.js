@@ -41,7 +41,8 @@ class MessageClassifier {
           'status da os', 'ordem de serviço', 'ordem de servico',
           'os número', 'os numero', 'os #', 'meu carro',
           'status do', 'andamento', 'situação', 'situacao',
-          'está pronto', 'esta pronto', 'terminado', 'concluído', 'concluido'
+          'está pronto', 'esta pronto', 'terminado', 'concluído', 'concluido',
+          'meu veículo', 'meu veiculo', 'minha moto', 'meu caminhão'
         ],
         confidence: 0.9,
         requiresDB: true,
@@ -64,7 +65,8 @@ class MessageClassifier {
         keywords: [
           'buscar cliente', 'procurar cliente', 'cliente cadastrado',
           'dados do cliente', 'telefone do cliente', 'cpf do cliente',
-          'listar clientes', 'ver clientes', 'mostrar clientes'
+          'listar clientes', 'ver clientes', 'mostrar clientes',
+          'dados do', 'informações do', 'informacoes do', 'contato do'
         ],
         confidence: 0.85,
         requiresDB: true,
@@ -91,7 +93,11 @@ class MessageClassifier {
           'barulho', 'problema', 'defeito', 'não funciona', 'nao funciona',
           'falha', 'quebrou', 'parou', 'luz acendeu', 'está fazendo',
           'esta fazendo', 'sintoma', 'estranho', 'errado',
-          'trepidação', 'trepidacao', 'vazamento', 'fumaça', 'fumaca'
+          'trepidação', 'trepidacao', 'vazamento', 'fumaça', 'fumaca',
+          'fazendo barulho', 'barulho no', 'ruído', 'ruido', 'barulho estranho',
+          'trepidando', 'trepida', 'vibração', 'vibracao', 'vibrando',
+          'falhando', 'engasgando', 'o que pode ser', 'pode ser o que',
+          'luz do motor', 'painel acendeu', 'acendeu no painel'
         ],
         confidence: 0.85,
         description: 'Diagnóstico técnico de problemas'
@@ -123,7 +129,10 @@ class MessageClassifier {
           'recomenda', 'devo fazer', 'preciso trocar', 'quando trocar',
           'intervalo de', 'manutenção preventiva', 'manutencao preventiva',
           'o que fazer', 'qual o ideal', 'melhor opção', 'melhor opcao',
-          'vale a pena', 'aconselha'
+          'vale a pena', 'aconselha',
+          'quando devo', 'quando deveria', 'hora de trocar', 'quando fazer',
+          'devo trocar', 'preciso fazer', 'é necessário', 'e necessario',
+          'qual a hora de', 'tempo de trocar'
         ],
         confidence: 0.85,
         description: 'Recomendações técnicas'
@@ -152,6 +161,28 @@ class MessageClassifier {
     }
 
     const messageLower = message.toLowerCase().trim();
+
+    // 🔍 PRIORIDADE: Detecta diagnósticos (palavras de problema têm prioridade)
+    const problemWords = [
+      'barulho', 'problema', 'defeito', 'falha', 'quebrou', 'parou',
+      'luz acendeu', 'trepidando', 'vazamento', 'fumaça', 'fumaca',
+      'o que pode ser', 'ruído', 'ruido', 'vibrando', 'falhando', 'engasgando'
+    ];
+    
+    const hasProblem = problemWords.some(word => messageLower.includes(word));
+    
+    if (hasProblem) {
+      // Se tem palavra de problema, prioriza DIAGNOSTICO
+      console.log('🚨 [CLASSIFIER] Detectado: DIAGNOSTICO (Problema técnico - prioridade)');
+      return {
+        type: 'CONVERSATION',
+        subtype: 'DIAGNOSTICO',
+        confidence: 0.9,
+        processor: 'AGNO_AI',
+        reason: 'Technical problem diagnosis - high priority',
+        requiresDB: false
+      };
+    }
 
     // 1️⃣ VERIFICA SE É UMA AÇÃO ESTRUTURADA (processar localmente)
     for (const [action, pattern] of Object.entries(this.actionPatterns)) {
