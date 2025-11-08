@@ -1831,6 +1831,7 @@ async function processarComAgnoAI(message, userId, agentId = 'oficinaia', sessio
         if (response.ok) {
             const data = await response.json();
             console.log('✅ [AGNO_AI] Resposta recebida');
+            console.log('📦 [AGNO_AI] Dados completos:', JSON.stringify(data).substring(0, 500));
 
             // Extrair o conteúdo da resposta de forma segura
             let responseText = '';
@@ -1848,6 +1849,8 @@ async function processarComAgnoAI(message, userId, agentId = 'oficinaia', sessio
             } else {
                 responseText = 'Resposta recebida do agente (formato não reconhecido)';
             }
+
+            console.log('📝 [AGNO_AI] Texto extraído:', responseText.substring(0, 200) + '...');
 
             return {
                 success: true,
