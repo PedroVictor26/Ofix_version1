@@ -9,6 +9,11 @@ import ConsultasOSService from '../services/consultasOS.service.js';
 import NLPService from '../services/nlp.service.js';
 import prisma from '../config/database.js';
 
+// ⭐ NOVA ARQUITETURA MULTI-AGENTE (Nov 2025)
+import MessageClassifier from '../services/message-classifier.service.js';
+import AgendamentoLocal from '../services/agendamento-local.service.js';
+import LocalResponse from '../services/local-response.service.js';
+
 const router = express.Router();
 
 // Configurações do Agno (pode vir de variáveis de ambiente)
@@ -1673,7 +1678,7 @@ router.get('/agents', verificarAuth, async (req, res) => {
 // Chat com o agente Agno
 router.post('/chat', verificarAuth, async (req, res) => {
     try {
-        const { message, agent_id, session_id } = req.body;
+        const { message, agent_id, session_id, contexto_ativo } = req.body;
 
         if (!message) {
             return res.status(400).json({ error: 'Mensagem é obrigatória' });
@@ -1683,25 +1688,181 @@ router.post('/chat', verificarAuth, async (req, res) => {
         const userId = req.user?.id || req.user?.userId || 'anonymous';
         const agentId = agent_id || 'oficinaia'; // Usar oficinaia por padrão, mas permitir override
 
-        console.log('💬 Enviando mensagem para agente Agno:', {
+        console.log('💬 [CHAT] Nova mensagem recebida:', {
             user: req.user.email,
             user_id: userId,
-            agent_id: agentId,
-            session_id: session_id,
             message: message.substring(0, 100) + '...'
         });
 
-        // Preparar payload JSON
-        const payload = {
-            message: message,
-            user_id: userId
-        };
+        // ⭐ NOVA ARQUITETURA MULTI-AGENTE
+        // 1️⃣ CLASSIFICA A MENSAGEM
+        const classification = MessageClassifier.classify(message);
+        console.log('🎯 [CLASSIFIER] Resultado:', {
+            processor: classification.processor,
+            type: classification.type,
+            subtype: classification.subtype,
+            confidence: classification.confidence,
+            reason: classification.reason
+        });
 
-        // Adicionar session_id para manter contexto (opcional)
-        if (session_id) {
-            payload.session_id = session_id;
+        // 2️⃣ ROTEAMENTO INTELIGENTE
+        let responseData;
+
+        if (classification.processor === 'BACKEND_LOCAL') {
+            // ⚡ PROCESSA LOCALMENTE (rápido, confiável)
+            console.log('⚡ [BACKEND_LOCAL] Processando localmente...');
+            const startTime = Date.now();
+            
+            responseData = await processarLocal(message, classification, userId, contexto_ativo, req);
+            
+            const duration = Date.now() - startTime;
+            console.log(`✅ [BACKEND_LOCAL] Processado em ${duration}ms`);
+            
+            // Adiciona metadata
+            responseData.metadata = {
+                ...responseData.metadata,
+                processed_by: 'BACKEND_LOCAL',
+                processing_time_ms: duration,
+                classification: classification
+            };
+
+            return res.json({
+                success: true,
+                ...responseData
+            });
+
+        } else {
+            // 🧠 ENVIA PARA AGNO AI (inteligente, conversacional)
+            console.log('🧠 [AGNO_AI] Enviando para Agno AI...');
+            const startTime = Date.now();
+            
+            responseData = await processarComAgnoAI(message, userId, agentId, session_id);
+            
+            const duration = Date.now() - startTime;
+            console.log(`✅ [AGNO_AI] Processado em ${duration}ms`);
+            
+            // Adiciona metadata
+            if (responseData.metadata) {
+                responseData.metadata.processed_by = 'AGNO_AI';
+                responseData.metadata.processing_time_ms = duration;
+                responseData.metadata.classification = classification;
+            }
+
+            return res.json(responseData);
         }
 
+    } catch (error) {
+        console.error('❌ [CHAT] Erro geral:', error);
+        res.status(500).json({
+            error: 'Erro interno do servidor',
+            message: error.message
+        });
+    }
+});
+
+// ============================================================
+// 🔧 FUNÇÕES AUXILIARES - PROCESSAMENTO LOCAL
+// ============================================================
+
+/**
+ * Processa mensagem localmente (SEM Agno AI)
+ */
+async function processarLocal(message, classification, userId, contexto_ativo, req) {
+    try {
+        switch (classification.type) {
+            case 'GREETING':
+                // Saudação instantânea
+                const usuario = req.user;
+                return LocalResponse.formatarResposta(
+                    LocalResponse.gerarSaudacao(usuario),
+                    'greeting'
+                );
+
+            case 'HELP':
+                // Menu de ajuda
+                return LocalResponse.formatarResposta(
+                    LocalResponse.gerarMenuAjuda(),
+                    'help'
+                );
+
+            case 'ACTION':
+                // Ações estruturadas (CRUD)
+                return await processarAcaoLocal(message, classification.subtype, userId, contexto_ativo);
+
+            default:
+                // Fallback: envia para Agno AI
+                console.log('⚠️ [BACKEND_LOCAL] Tipo não reconhecido, enviando para Agno AI');
+                return await processarComAgnoAI(message, userId);
+        }
+    } catch (error) {
+        console.error('❌ [BACKEND_LOCAL] Erro:', error);
+        // Em caso de erro, tenta Agno AI como fallback
+        return await processarComAgnoAI(message, userId);
+    }
+}
+
+/**
+ * Processa ações estruturadas localmente
+ */
+async function processarAcaoLocal(message, actionType, userId, contexto_ativo) {
+    console.log(`🔧 [ACAO_LOCAL] Processando: ${actionType}`);
+
+    try {
+        switch (actionType) {
+            case 'AGENDAMENTO':
+                // ⭐ AGENDAMENTO LOCAL (10x mais rápido) - NOVA IMPLEMENTAÇÃO
+                return await AgendamentoLocal.processar(message, userId, contexto_ativo);
+
+            case 'CONSULTA_OS':
+                // Consulta de Ordem de Serviço (usa função existente)
+                return await processarConsultaOS(message);
+
+            case 'CONSULTA_ESTOQUE':
+                // Consulta de estoque (usa função existente)
+                return await processarConsultaEstoque(message);
+
+            case 'CONSULTA_CLIENTE':
+                // Consulta de cliente (usa função existente)
+                return await processarConsultaCliente(message, contexto_ativo, userId);
+
+            case 'CADASTRO_CLIENTE':
+                // Cadastro de cliente (usa função existente)
+                return await processarCadastroCliente(message, userId);
+
+            case 'ESTATISTICAS':
+                // Estatísticas (usa função existente)
+                return await processarEstatisticas(message);
+
+            default:
+                // Ação não implementada, envia para Agno AI
+                console.log(`⚠️ [ACAO_LOCAL] Ação ${actionType} não implementada, enviando para Agno AI`);
+                return await processarComAgnoAI(message, userId);
+        }
+    } catch (error) {
+        console.error(`❌ [ACAO_LOCAL] Erro ao processar ${actionType}:`, error);
+        // Em caso de erro, tenta Agno AI como fallback
+        return await processarComAgnoAI(message, userId);
+    }
+}
+
+/**
+ * Processa mensagem com Agno AI (mantém lógica original)
+ */
+async function processarComAgnoAI(message, userId, agentId = 'oficinaia', session_id = null) {
+    console.log('🧠 [AGNO_AI] Conectando com Agno...');
+
+    // Preparar payload JSON
+    const payload = {
+        message: message,
+        user_id: userId
+    };
+
+    // Adicionar session_id para manter contexto (opcional)
+    if (session_id) {
+        payload.session_id = session_id;
+    }
+
+    try {
         const response = await fetch(`${AGNO_API_URL}/chat`, {
             method: 'POST',
             headers: {
@@ -1714,7 +1875,7 @@ router.post('/chat', verificarAuth, async (req, res) => {
 
         if (response.ok) {
             const data = await response.json();
-            console.log('✅ Resposta recebida do agente Agno:', JSON.stringify(data, null, 2));
+            console.log('✅ [AGNO_AI] Resposta recebida');
 
             // Extrair o conteúdo da resposta de forma segura
             let responseText = '';
@@ -1733,10 +1894,10 @@ router.post('/chat', verificarAuth, async (req, res) => {
                 responseText = 'Resposta recebida do agente (formato não reconhecido)';
             }
 
-            res.json({
+            return {
                 success: true,
                 response: responseText,
-                session_id: data.session_id, // Retornar session_id para o frontend
+                session_id: data.session_id,
                 metadata: {
                     agent_id: agentId,
                     run_id: data.run_id,
@@ -1745,31 +1906,42 @@ router.post('/chat', verificarAuth, async (req, res) => {
                     tokens_used: data.tokens_used || data.metrics?.total_tokens,
                     timestamp: new Date().toISOString()
                 }
-            });
+            };
         } else {
             const errorData = await response.text();
-            console.error('❌ Erro na resposta do agente Agno:', response.status, errorData);
+            console.error('❌ [AGNO_AI] Erro na resposta:', response.status, errorData);
 
-            let suggestion = null;
-            if (response.status === 404) {
-                suggestion = 'Agente não encontrado. Use GET /api/agno/agents para listar agentes disponíveis.';
-            }
-
-            res.status(response.status).json({
-                error: 'Erro no processamento da mensagem',
-                details: errorData,
-                agno_status: response.status,
-                suggestion: suggestion
-            });
+            throw new Error(`Agno AI retornou status ${response.status}: ${errorData}`);
         }
     } catch (error) {
-        console.error('❌ Erro ao comunicar com agente Agno:', error.message);
-        res.status(500).json({
-            error: 'Erro interno do servidor',
-            message: error.message
-        });
+        console.error('❌ [AGNO_AI] Erro ao comunicar:', error.message);
+        
+        // FALLBACK: Resposta local em caso de erro do Agno
+        return LocalResponse.formatarResposta(
+            `🤖 **Assistente Matias temporariamente indisponível**\n\n` +
+            `Sua mensagem: "${message}"\n\n` +
+            `⚠️ Estamos com problemas de conexão. Por favor, tente novamente em instantes.\n\n` +
+            `💡 **Enquanto isso, posso ajudar com:**\n` +
+            `• Agendamentos (digite "agendar")\n` +
+            `• Consulta de OS (digite "status da OS")\n` +
+            `• Ajuda (digite "ajuda")`,
+            'error',
+            { agno_error: error.message }
+        );
     }
-});
+}
+
+// ============================================================
+// 🎉 NOVA ARQUITETURA MULTI-AGENTE INTEGRADA!
+// 
+// As funções existentes (processarConsultaOS, processarConsultaEstoque, etc)
+// são reutilizadas. A nova arquitetura adiciona:
+// - MessageClassifier (classifica mensagens)
+// - AgendamentoLocal (agendamentos sem AI - 10x mais rápido)
+// - LocalResponse (respostas instantâneas)
+// - processarLocal/processarAcaoLocal (roteamento inteligente)
+// - processarComAgnoAI (integração com Agno)
+// ============================================================
 
 // Rota para testar com parâmetros específicos (debug)
 router.post('/chat-debug', verificarAuth, async (req, res) => {
