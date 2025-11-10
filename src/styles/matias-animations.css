@@ -1,0 +1,523 @@
+/*
+ * MATIAS Animation Library
+ * Specialized animations for enhanced AI assistant interactions
+ */
+
+/* Voice Animation Specific */
+@keyframes voiceWave {
+  0% {
+    height: 20px;
+    background: linear-gradient(to top, var(--matias-primary-500), var(--matias-primary-600));
+  }
+  50% {
+    height: 40px;
+    background: linear-gradient(to top, var(--matias-primary-600), var(--matias-primary-700));
+  }
+  100% {
+    height: 20px;
+    background: linear-gradient(to top, var(--matias-primary-500), var(--matias-primary-600));
+  }
+}
+
+@keyframes voicePulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(37, 99, 235, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 0 10px rgba(37, 99, 235, 0);
+  }
+}
+
+@keyframes voiceBar {
+  0%, 100% {
+    transform: scaleY(0.3);
+    background: linear-gradient(to top, var(--matias-primary-400), var(--matias-primary-500));
+  }
+  50% {
+    transform: scaleY(1);
+    background: linear-gradient(to top, var(--matias-primary-600), var(--matias-primary-700));
+  }
+}
+
+/* Voice Waveform Container */
+.matias-voice-waveform {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  height: 40px;
+  padding: 0 8px;
+}
+
+.matias-voice-bar {
+  width: 4px;
+  height: 100%;
+  background: linear-gradient(to top, var(--matias-primary-500), var(--matias-primary-600));
+  border-radius: 2px;
+  animation: voiceBar 0.8s ease-in-out infinite;
+}
+
+.matias-voice-bar:nth-child(1) { animation-delay: 0s; }
+.matias-voice-bar:nth-child(2) { animation-delay: 0.1s; }
+.matias-voice-bar:nth-child(3) { animation-delay: 0.2s; }
+.matias-voice-bar:nth-child(4) { animation-delay: 0.3s; }
+.matias-voice-bar:nth-child(5) { animation-delay: 0.4s; }
+
+/* Message Animations */
+@keyframes messageSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(30px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes messageTypewriter {
+  from { width: 0; }
+  to { width: 100%; }
+}
+
+@keyframes messageGlow {
+  0%, 100% {
+    box-shadow: 0 0 5px rgba(37, 99, 235, 0.2);
+  }
+  50% {
+    box-shadow: 0 0 20px rgba(37, 99, 235, 0.4);
+  }
+}
+
+/* Suggestion Animations */
+@keyframes suggestionSlide {
+  from {
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes suggestionHover {
+  0% {
+    transform: translateX(0) scale(1);
+  }
+  50% {
+    transform: translateX(5px) scale(1.02);
+  }
+  100% {
+    transform: translateX(0) scale(1);
+  }
+}
+
+/* Loading States */
+@keyframes skeletonPulse {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+@keyframes loadingSpinner {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes loadingDots {
+  0%, 80%, 100% {
+    opacity: 0;
+    transform: scale(0.8);
+  }
+  40% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* Chat Interface Animations */
+@keyframes chatWindowOpen {
+  from {
+    opacity: 0;
+    transform: translateY(100px) scale(0.8);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes chatWindowClose {
+  from {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(100px) scale(0.8);
+  }
+}
+
+@keyframes chatButtonFloat {
+  0%, 100% {
+    transform: translateY(0) rotate(0deg);
+  }
+  25% {
+    transform: translateY(-5px) rotate(5deg);
+  }
+  75% {
+    transform: translateY(5px) rotate(-5deg);
+  }
+}
+
+@keyframes chatButtonRing {
+  0% {
+    box-shadow: 0 0 0 0 rgba(37, 99, 235, 0.4);
+  }
+  25% {
+    box-shadow: 0 0 0 10px rgba(37, 99, 235, 0.1);
+  }
+  50% {
+    box-shadow: 0 0 0 20px rgba(37, 99, 235, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(37, 99, 235, 0);
+  }
+}
+
+/* Progress Indicators */
+@keyframes progressGrow {
+  from {
+    width: 0%;
+  }
+  to {
+    width: var(--progress-width, 100%);
+  }
+}
+
+@keyframes progressPulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.6;
+  }
+}
+
+/* Status Animations */
+@keyframes statusOnline {
+  0%, 100% {
+    background-color: var(--matias-success);
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4);
+  }
+  50% {
+    background-color: var(--matias-success);
+    box-shadow: 0 0 0 6px rgba(16, 185, 129, 0);
+  }
+}
+
+@keyframes statusAway {
+  0%, 100% {
+    background-color: var(--matias-warning);
+  }
+  50% {
+    background-color: var(--matias-warning);
+    opacity: 0.6;
+  }
+}
+
+@keyframes statusBusy {
+  0%, 100% {
+    background-color: var(--matias-error);
+  }
+  50% {
+    background-color: var(--matias-error);
+    transform: scale(1.2);
+  }
+}
+
+/* Notification Animations */
+@keyframes notificationSlide {
+  from {
+    opacity: 0;
+    transform: translateX(100%);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes notificationBounce {
+  0%, 100% {
+    transform: translateX(0) scale(1);
+  }
+  10% {
+    transform: translateX(-5px) scale(1.05);
+  }
+  30% {
+    transform: translateX(5px) scale(0.95);
+  }
+  50% {
+    transform: translateX(-3px) scale(1.02);
+  }
+  70% {
+    transform: translateX(3px) scale(0.98);
+  }
+  90% {
+    transform: translateX(-1px) scale(1.01);
+  }
+}
+
+/* Micro-interactions */
+@keyframes buttonPress {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(0.95);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes buttonHover {
+  0% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-2px);
+  }
+  100% {
+    transform: translateY(0);
+  }
+}
+
+@keyframes cardLift {
+  0% {
+    transform: translateY(0);
+    box-shadow: var(--matias-shadow-md);
+  }
+  100% {
+    transform: translateY(-4px);
+    box-shadow: var(--matias-shadow-xl);
+  }
+}
+
+/* Form Animations */
+@keyframes inputFocus {
+  0% {
+    border-color: var(--matias-gray-300);
+    box-shadow: none;
+  }
+  100% {
+    border-color: var(--matias-primary-500);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  }
+}
+
+@keyframes labelFloat {
+  0% {
+    transform: translateY(0);
+    font-size: var(--matias-text-base);
+  }
+  100% {
+    transform: translateY(-20px);
+    font-size: var(--matias-text-sm);
+  }
+}
+
+/* Page Transitions */
+@keyframes pageFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pageSlideIn {
+  from {
+    opacity: 0;
+    transform: translateX(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* Success/Error Animations */
+@keyframes successCheckmark {
+  0% {
+    stroke-dashoffset: 100;
+    transform: scale(0);
+  }
+  50% {
+    stroke-dashoffset: 0;
+    transform: scale(1.1);
+  }
+  100% {
+    stroke-dashoffset: 0;
+    transform: scale(1);
+  }
+}
+
+@keyframes errorShake {
+  0%, 100% {
+    transform: translateX(0);
+  }
+  10%, 30%, 50%, 70%, 90% {
+    transform: translateX(-5px);
+  }
+  20%, 40%, 60%, 80% {
+    transform: translateX(5px);
+  }
+}
+
+@keyframes successBounce {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.2);
+  }
+}
+
+/* Utility Animation Classes */
+.matias-animate-voice-wave .matias-voice-bar {
+  animation: voiceBar 0.8s ease-in-out infinite;
+}
+
+.matias-animate-message-slide {
+  animation: messageSlideIn 0.3s ease-out;
+}
+
+.matias-animate-suggestion-slide {
+  animation: suggestionSlide 0.2s ease-out;
+}
+
+.matias-animate-chat-open {
+  animation: chatWindowOpen 0.4s ease-out;
+}
+
+.matias-animate-chat-close {
+  animation: chatWindowClose 0.3s ease-in;
+}
+
+.matias-animate-button-float {
+  animation: chatButtonFloat 3s ease-in-out infinite;
+}
+
+.matias-animate-button-ring {
+  animation: chatButtonRing 2s ease-out infinite;
+}
+
+.matias-animate-typing .matias-typing-dot {
+  animation: typing-bounce 1.4s infinite ease-in-out;
+}
+
+.matias-animate-loading-spinner {
+  animation: loadingSpinner 1s linear infinite;
+}
+
+.matias-animate-progress {
+  animation: progressGrow 1s ease-out;
+}
+
+.matiaS-animate-status-online {
+  animation: statusOnline 2s ease-in-out infinite;
+}
+
+.matias-animate-notification {
+  animation: notificationSlide 0.3s ease-out, notificationBounce 0.6s ease-out 0.3s;
+}
+
+.matias-animate-error {
+  animation: errorShake 0.5s ease-in-out;
+}
+
+.matias-animate-success {
+  animation: successBounce 0.4s ease-out;
+}
+
+/* Staggered Animations */
+.matias-stagger > * {
+  opacity: 0;
+  animation: fadeIn 0.3s ease-out forwards;
+}
+
+.matias-stagger > *:nth-child(1) { animation-delay: 0.1s; }
+.matias-stagger > *:nth-child(2) { animation-delay: 0.2s; }
+.matias-stagger > *:nth-child(3) { animation-delay: 0.3s; }
+.matias-stagger > *:nth-child(4) { animation-delay: 0.4s; }
+.matias-stagger > *:nth-child(5) { animation-delay: 0.5s; }
+.matias-stagger > *:nth-child(6) { animation-delay: 0.6s; }
+.matias-stagger > *:nth-child(7) { animation-delay: 0.7s; }
+.matias-stagger > *:nth-child(8) { animation-delay: 0.8s; }
+
+/* Hover Animations */
+.matias-hover-lift {
+  transition: transform var(--matias-duration-normal) var(--matias-ease-out);
+}
+
+.matias-hover-lift:hover {
+  transform: translateY(-2px);
+}
+
+.matias-hover-scale {
+  transition: transform var(--matias-duration-fast) var(--matias-ease-out);
+}
+
+.matias-hover-scale:hover {
+  transform: scale(1.05);
+}
+
+.matias-hover-glow {
+  transition: box-shadow var(--matias-duration-normal) var(--matias-ease-out);
+}
+
+.matias-hover-glow:hover {
+  box-shadow: 0 0 15px rgba(37, 99, 235, 0.2);
+}
+
+/* Responsive Animations */
+@media (prefers-reduced-motion: reduce) {
+  .matias-animate-voice-wave .matias-voice-bar,
+  .matias-animate-button-float,
+  .matias-animate-button-ring,
+  .matiaS-animate-status-online {
+    animation: none;
+  }
+
+  .matias-hover-lift:hover,
+  .matias-hover-scale:hover {
+    transform: none;
+  }
+}
+
+/* Performance Optimizations */
+.matias-will-change-transform {
+  will-change: transform;
+}
+
+.matias-will-change-opacity {
+  will-change: opacity;
+}
+
+.matias-gpu-accelerated {
+  transform: translateZ(0);
+  backface-visibility: hidden;
+  perspective: 1000px;
+}
