@@ -138,51 +138,36 @@ const AIPage = () => {
     }
   }, []);
 
-  // Carregar histórico de conversas ao montar o componente
-  useEffect(() => {
-    const carregarHistorico = async () => {
-      if (!user?.id) return;
-
-      try {
-        // ✅ USAR HOOK useAuthHeaders
-        const authHeaders = getAuthHeaders();
-
-        const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:1000';
-        const API_BASE = API_BASE_URL.replace('/api', '');
-
-        const response = await fetch(`${API_BASE}/agno/historico-conversa?usuario_id=${user.id}`, {
-          headers: authHeaders
-        });
-
-        if (response.ok) {
-          const data = await response.json();
-          if (data.success && data.mensagens?.length > 0) {
-            const mensagensFormatadas = data.mensagens.map(msg => ({
-              id: msg.id || Date.now(),
-              tipo: msg.tipo_remetente === 'user' ? 'usuario' : 'agente',
-              conteudo: msg.conteudo,
-              timestamp: msg.timestamp
-            }));
-            setConversas(mensagensFormatadas);
-            logger.info('Histórico carregado', {
-              mensagensCount: mensagensFormatadas.length,
-              context: 'carregarHistorico'
-            });
-          }
-        }
-      } catch (error) {
-        // ✅ LOGGING ESTRUTURADO
-        logger.error('Erro ao carregar histórico', {
-          error: error.message,
-          userId: user?.id,
-          context: 'carregarHistorico'
-        });
-        showToast('Erro ao carregar histórico', 'error');
-      }
-    };
-
-    carregarHistorico();
-  }, [user?.id, getAuthHeaders, showToast]);
+  // 🧠 DESABILITADO: Histórico antigo do banco (não é necessário com sistema de memória)
+  // O Agno AI agora gerencia suas próprias memórias via LanceDB/SQLite
+  // useEffect(() => {
+  //   const carregarHistorico = async () => {
+  //     if (!user?.id) return;
+  //     try {
+  //       const authHeaders = getAuthHeaders();
+  //       const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:1000';
+  //       const API_BASE = API_BASE_URL.replace('/api', '');
+  //       const response = await fetch(`${API_BASE}/agno/historico-conversa?usuario_id=${user.id}`, {
+  //         headers: authHeaders
+  //       });
+  //       if (response.ok) {
+  //         const data = await response.json();
+  //         if (data.success && data.mensagens?.length > 0) {
+  //           const mensagensFormatadas = data.mensagens.map(msg => ({
+  //             id: msg.id || Date.now(),
+  //             tipo: msg.tipo_remetente === 'user' ? 'usuario' : 'agente',
+  //             conteudo: msg.conteudo,
+  //             timestamp: msg.timestamp
+  //           }));
+  //           setConversas(mensagensFormatadas);
+  //         }
+  //       }
+  //     } catch (error) {
+  //       logger.error('Erro ao carregar histórico', { error: error.message });
+  //     }
+  //   };
+  //   carregarHistorico();
+  // }, [user?.id, getAuthHeaders, showToast]);
 
   // Mensagem inicial do sistema (se não houver histórico)
   useEffect(() => {
@@ -190,12 +175,12 @@ const AIPage = () => {
       const mensagemInicial = {
         id: Date.now(),
         tipo: 'sistema',
-        conteudo: `Olá ${user?.nome || 'usuário'}! 👋\n\nSou o assistente de IA do OFIX, especializado em:\n\n🔧 Diagnósticos automotivos\n🚗 Gestão de peças e estoque\n💼 Suporte comercial\n📊 Análise de dados operacionais\n\nComo posso ajudá-lo hoje?`,
+        conteudo: `Olá ${user?.nome || 'usuário'}! 👋\n\n**Bem-vindo ao Assistente IA do OFIX!**\n\nSou especializado em:\n\n🔧 Diagnósticos automotivos\n🚗 Gestão de peças e estoque\n💼 Suporte comercial\n📊 Análise de dados operacionais\n\n${memoriaAtiva ? '🧠 **Sistema de memória ativo** - Vou lembrar das nossas conversas!' : ''}\n\nComo posso ajudá-lo hoje?`,
         timestamp: new Date().toISOString()
       };
       setConversas([mensagemInicial]);
     }
-  }, [user, conversas.length]);
+  }, [user, conversas.length, memoriaAtiva]);
 
   // Auto-scroll para última mensagem
   useEffect(() => {
@@ -518,14 +503,17 @@ const AIPage = () => {
       const storageKey = getStorageKey();
       localStorage.removeItem(storageKey);
 
+      // 🧠 Mensagem atualizada com info sobre memória
       const mensagemInicial = {
         id: Date.now(),
         tipo: 'sistema',
-        conteudo: `Olá ${user?.nome || 'usuário'}! 👋\n\nSou o assistente de IA do OFIX, especializado em:\n\n🔧 Diagnósticos automotivos\n🚗 Gestão de peças e estoque\n💼 Suporte comercial\n📊 Análise de dados operacionais\n\nComo posso ajudá-lo hoje?`,
+        conteudo: `Olá ${user?.nome || 'usuário'}! 👋\n\n**Nova conversa iniciada!**\n\nSou o assistente de IA do OFIX, especializado em:\n\n🔧 Diagnósticos automotivos\n🚗 Gestão de peças e estoque\n💼 Suporte comercial\n📊 Análise de dados operacionais\n\n${memoriaAtiva ? '🧠 **Sistema de memória ativo** - Eu lembro das nossas conversas anteriores!' : ''}\n\nComo posso ajudá-lo hoje?`,
         timestamp: new Date().toISOString()
       };
       setConversas([mensagemInicial]);
       salvarConversasLocal([mensagemInicial]);
+      
+      showToast('Chat limpo! Nova conversa iniciada.', 'success');
     } catch (error) {
       logger.error('Erro ao limpar histórico', {
         error: error.message,
