@@ -1825,14 +1825,21 @@ async function processarComAgnoAI(message, userId, agentId = 'oficinaia', sessio
         session_id: payload.session_id 
     });
 
+    // 👉 Agno AI usa FormData, não JSON
+    const formData = new URLSearchParams();
+    formData.append('message', message);
+    if (payload.user_id) formData.append('user_id', payload.user_id);
+    if (payload.session_id) formData.append('session_id', payload.session_id);
+
     try {
-        const response = await fetch(`${AGNO_API_URL}/run`, {
+        // 🎯 agent_id vai na URL, não no body
+        const response = await fetch(`${AGNO_API_URL}/agents/${agentId || 'matias'}/runs`, {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json',
+                'Content-Type': 'application/x-www-form-urlencoded',
                 ...(AGNO_API_TOKEN && { 'Authorization': `Bearer ${AGNO_API_TOKEN}` })
             },
-            body: JSON.stringify(payload),
+            body: formData.toString(),
             timeout: 30000 // 30 segundos timeout
         });
 
