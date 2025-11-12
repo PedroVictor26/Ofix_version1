@@ -1571,79 +1571,98 @@ const AIPage = () => {
         </div>
       )}
 
-      {/* 🧠 Card de Memórias */}
-      {memoriaAtiva && (
-        <div className="bg-white rounded-xl shadow-sm border border-blue-200 p-4 mb-4 matias-animate-fade-in">
-          <div className="flex items-center justify-between mb-3">
-            <button
-              onClick={() => setMostrarMemorias(!mostrarMemorias)}
-              className="flex items-center gap-2 text-blue-900 font-semibold hover:text-blue-700 transition-colors"
-            >
-              <Brain className="w-5 h-5" />
-              <span>O que o Matias lembra sobre você</span>
+      {/* 🧠 Card de Memórias - SEMPRE VISÍVEL */}
+      <div className="bg-white rounded-xl shadow-sm border border-blue-200 p-4 mb-4 matias-animate-fade-in">
+        <div className="flex items-center justify-between mb-3">
+          <button
+            onClick={() => setMostrarMemorias(!mostrarMemorias)}
+            className="flex items-center gap-2 text-blue-900 font-semibold hover:text-blue-700 transition-colors"
+          >
+            <Brain className="w-5 h-5" />
+            <span>O que o Matias lembra sobre você</span>
+            {memoriaAtiva && (
               <span className="text-xs bg-blue-100 px-2 py-0.5 rounded-full">
                 {memorias.length}
               </span>
-            </button>
-            
-            <div className="flex items-center gap-2">
-              {mostrarMemorias && (
-                <>
-                  <Button
-                    onClick={carregarMemorias}
-                    variant="ghost"
-                    size="sm"
-                    disabled={loadingMemorias}
-                    className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
-                    title="Atualizar memórias"
-                  >
-                    <RefreshCw className={`w-4 h-4 ${loadingMemorias ? 'animate-spin' : ''}`} />
-                  </Button>
-                  
-                  <Button
-                    onClick={excluirMemorias}
-                    variant="ghost"
-                    size="sm"
-                    className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                    title="Esquecer minhas conversas (LGPD)"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </Button>
-                </>
-              )}
-            </div>
+            )}
+            {!memoriaAtiva && (
+              <span className="text-xs bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded-full">
+                Aguardando ativação
+              </span>
+            )}
+          </button>
+          
+          <div className="flex items-center gap-2">
+            {mostrarMemorias && memoriaAtiva && (
+              <>
+                <Button
+                  onClick={carregarMemorias}
+                  variant="ghost"
+                  size="sm"
+                  disabled={loadingMemorias}
+                  className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                  title="Atualizar memórias"
+                >
+                  <RefreshCw className={`w-4 h-4 ${loadingMemorias ? 'animate-spin' : ''}`} />
+                </Button>
+                
+                <Button
+                  onClick={excluirMemorias}
+                  variant="ghost"
+                  size="sm"
+                  className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                  title="Esquecer minhas conversas (LGPD)"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </Button>
+              </>
+            )}
           </div>
-
-          {mostrarMemorias && (
-            <div className="mt-3 pt-3 border-t border-blue-100">
-              {loadingMemorias ? (
-                <div className="flex items-center justify-center py-4">
-                  <Loader2 className="w-5 h-5 text-blue-500 animate-spin" />
-                  <span className="ml-2 text-sm text-gray-600">Carregando memórias...</span>
-                </div>
-              ) : memorias.length > 0 ? (
-                <ul className="space-y-2">
-                  {memorias.map((memoria, idx) => (
-                    <li key={idx} className="flex items-start gap-2 text-sm text-gray-700">
-                      <span className="text-blue-500 mt-1">•</span>
-                      <span>{memoria.memory || memoria.content || JSON.stringify(memoria)}</span>
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <div className="text-center py-4">
-                  <p className="text-sm text-gray-600 italic">
-                    Ainda não há memórias salvas.
-                  </p>
-                  <p className="text-xs text-gray-500 mt-1">
-                    Continue conversando com o Matias!
-                  </p>
-                </div>
-              )}
-            </div>
-          )}
         </div>
-      )}
+
+        {mostrarMemorias && (
+          <div className="mt-3 pt-3 border-t border-blue-100">
+            {!memoriaAtiva ? (
+              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                <p className="text-sm text-yellow-800 font-medium mb-2">
+                  ⚠️ Sistema de memória não ativado
+                </p>
+                <p className="text-xs text-yellow-700 mb-3">
+                  Configure no Render para o Matias lembrar das conversas:
+                </p>
+                <ol className="text-xs text-yellow-700 space-y-1 list-decimal list-inside">
+                  <li>Backend → Environment → <code className="bg-yellow-100 px-1 rounded">AGNO_ENABLE_MEMORY=true</code></li>
+                  <li>Agente → Start Command → <code className="bg-yellow-100 px-1 rounded">python agent_with_memory.py</code></li>
+                  <li>Fazer Deploy Manual</li>
+                </ol>
+              </div>
+            ) : loadingMemorias ? (
+              <div className="flex items-center justify-center py-4">
+                <Loader2 className="w-5 h-5 text-blue-500 animate-spin" />
+                <span className="ml-2 text-sm text-gray-600">Carregando memórias...</span>
+              </div>
+            ) : memorias.length > 0 ? (
+              <ul className="space-y-2">
+                {memorias.map((memoria, idx) => (
+                  <li key={idx} className="flex items-start gap-2 text-sm text-gray-700">
+                    <span className="text-blue-500 mt-1">•</span>
+                    <span>{memoria.memory || memoria.content || JSON.stringify(memoria)}</span>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <div className="text-center py-4">
+                <p className="text-sm text-gray-600 italic">
+                  Ainda não há memórias salvas.
+                </p>
+                <p className="text-xs text-gray-500 mt-1">
+                  Continue conversando com o Matias!
+                </p>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
 
       {/* Área de Chat */}
       <div className="flex-1 bg-white rounded-xl shadow-sm border border-slate-200/60 flex flex-col overflow-hidden">
