@@ -31,7 +31,7 @@ let lastWarmingAttempt = null;
 // ⚡ CIRCUIT BREAKER para Rate Limit (429)
 let circuitBreakerOpen = false;
 let circuitBreakerOpenUntil = null;
-const CIRCUIT_BREAKER_COOLDOWN = 60000; // 1 minuto de cooldown após 429
+const CIRCUIT_BREAKER_COOLDOWN = 300000; // 5 minutos de cooldown após 429 (Render free tier)
 
 function checkCircuitBreaker() {
     if (circuitBreakerOpen) {
@@ -1788,22 +1788,24 @@ async function processarComAgnoAI(message, userId, agentId = 'oficinaia', sessio
 
     // ⚡ Verificar Circuit Breaker
     if (!checkCircuitBreaker()) {
+        const remainingMinutes = Math.ceil((circuitBreakerOpenUntil - Date.now()) / 60000);
         // Circuit breaker aberto - retornar fallback local imediatamente
         return {
             success: true,
-            response: `🤖 **Processando sua solicitação...**\n\n` +
-                `Você disse: "${message}"\n\n` +
-                `💡 **Como posso ajudar:**\n` +
-                `• Agendar um serviço\n` +
-                `• Consultar ordem de serviço\n` +
-                `• Ver peças disponíveis\n` +
-                `• Tirar dúvidas técnicas\n\n` +
-                `📞 **Contato direto:** (11) 1234-5678\n\n` +
-                `_Digite sua solicitação específica ou "ajuda" para ver todas as opções_`,
+            response: `⏳ **Assistente temporariamente ocupado**\n\n` +
+                `Estou processando muitas solicitações no momento.\n\n` +
+                `🔄 **Tente novamente em ${remainingMinutes} minuto${remainingMinutes > 1 ? 's' : ''}**\n\n` +
+                `💡 **Enquanto isso, posso ajudar com:**\n` +
+                `• Digite "agendar" para marcar um serviço\n` +
+                `• Digite "status OS" para consultar ordem\n` +
+                `• Digite "tem peça X" para verificar estoque\n` +
+                `• Digite "ajuda" para ver mais opções\n\n` +
+                `📞 **Urgente?** Ligue: (11) 1234-5678`,
             tipo: 'circuit_breaker_fallback',
             mode: 'local_fallback',
             metadata: {
                 circuit_breaker_active: true,
+                remaining_minutes: remainingMinutes,
                 timestamp: new Date().toISOString()
             }
         };
@@ -1884,22 +1886,24 @@ async function processarComAgnoAI(message, userId, agentId = 'oficinaia', sessio
             // Se for 429 (rate limit), abrir circuit breaker e retornar fallback
             if (response.status === 429) {
                 console.warn('⚠️ [AGNO_AI] Rate limit atingido - ativando circuit breaker');
-                openCircuitBreaker(); // Bloquear novas chamadas por 1 minuto
+                openCircuitBreaker(); // Bloquear novas chamadas por 5 minutos
                 return {
                     success: true,
-                    response: `🤖 **Diagnosticando seu problema...**\n\n` +
-                        `Você mencionou: "${message}"\n\n` +
-                        `💡 **Recomendações iniciais:**\n` +
-                        `• Para problemas com barulhos, é importante verificar a fonte do som\n` +
-                        `• Traga seu veículo para uma avaliação detalhada\n` +
-                        `• Nossa equipe pode fazer um diagnóstico completo\n\n` +
-                        `📞 **Contato:** (11) 1234-5678\n\n` +
-                        `_Ou agende um horário digitando "agendar"_`,
-                    tipo: 'diagnostico_fallback',
+                    response: `⏳ **Estou processando muitas solicitações**\n\n` +
+                        `O assistente está temporariamente ocupado devido ao alto volume de conversas.\n\n` +
+                        `🔄 **Aguarde 5 minutos e tente novamente**\n\n` +
+                        `💡 **Posso ajudar agora com:**\n` +
+                        `• Agendamentos (digite "agendar")\n` +
+                        `• Consulta de OS (digite "status OS")\n` +
+                        `• Verificar estoque (digite "tem peça X")\n\n` +
+                        `📞 **Contato direto:** (11) 1234-5678\n\n` +
+                        `_O sistema de memória continua ativo! 🧠_`,
+                    tipo: 'rate_limit_fallback',
                     mode: 'local_fallback',
                     metadata: {
                         rate_limited: true,
                         status: 429,
+                        cooldown_minutes: 5,
                         timestamp: new Date().toISOString()
                     }
                 };
@@ -2497,5 +2501,34 @@ router.get('/memory-status', async (req, res) => {
         });
     }
 });
+
+// ============================================================
+// 🔥 AUTO WARM-UP - Mantém Agno AI ativo (evita cold start)
+// ============================================================
+
+// Warm-up automático a cada 10 minutos (se configurado)
+if (AGNO_API_URL && AGNO_API_URL !== 'http://localhost:8000') {
+    const WARMUP_INTERVAL = 10 * 60 * 1000; // 10 minutos
+    
+    setInterval(async () => {
+        try {
+            console.log('🔥 [AUTO-WARMUP] Aquecendo Agno AI...');
+            const response = await fetch(`${AGNO_API_URL}/health`, {
+                signal: AbortSignal.timeout(5000)
+            });
+            
+            if (response.ok) {
+                console.log('✅ [AUTO-WARMUP] Agno AI aquecido com sucesso');
+                agnoWarmed = true;
+            } else {
+                console.warn('⚠️ [AUTO-WARMUP] Agno AI não respondeu:', response.status);
+            }
+        } catch (error) {
+            console.warn('⚠️ [AUTO-WARMUP] Erro ao aquecer:', error.message);
+        }
+    }, WARMUP_INTERVAL);
+    
+    console.log('🔥 [AUTO-WARMUP] Sistema ativado - aquecimento a cada 10min');
+}
 
 export default router;
