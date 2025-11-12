@@ -80,12 +80,15 @@ router.get('/config', async (req, res) => {
     try {
         console.log('🔧 Verificando configuração do Agno...');
 
+        const memoryEnabled = process.env.AGNO_ENABLE_MEMORY === 'true' && AGNO_API_URL !== 'http://localhost:8000';
+
         res.json({
             configured: !!AGNO_API_URL && AGNO_API_URL !== 'http://localhost:8000',
             agno_url: AGNO_API_URL,
             has_token: !!AGNO_API_TOKEN,
             agent_id: process.env.AGNO_DEFAULT_AGENT_ID || 'oficinaia',
             warmed: agnoWarmed,
+            memory_enabled: memoryEnabled, // ← NOVO: indica se memória está ativa
             last_warming: lastWarmingAttempt ? new Date(lastWarmingAttempt).toISOString() : null,
             timestamp: new Date().toISOString(),
             status: AGNO_API_URL === 'http://localhost:8000' ? 'development' : 'production'
@@ -1806,16 +1809,17 @@ async function processarComAgnoAI(message, userId, agentId = 'oficinaia', sessio
         };
     }
 
-    // Preparar payload JSON
+    // 🧠 Preparar payload JSON com suporte a MEMÓRIA
     const payload = {
         message: message,
-        user_id: userId
+        user_id: `user_${userId}`, // ← Formato: user_123 (para sistema de memória)
+        session_id: session_id || `session_${Date.now()}` // ← Criar session_id se não existir
     };
 
-    // Adicionar session_id para manter contexto (opcional)
-    if (session_id) {
-        payload.session_id = session_id;
-    }
+    console.log('🧠 [MEMÓRIA] Enviando com IDs:', { 
+        user_id: payload.user_id, 
+        session_id: payload.session_id 
+    });
 
     try {
         const response = await fetch(`${AGNO_API_URL}/chat`, {
@@ -1852,16 +1856,24 @@ async function processarComAgnoAI(message, userId, agentId = 'oficinaia', sessio
 
             console.log('📝 [AGNO_AI] Texto extraído:', responseText.substring(0, 200) + '...');
 
+            // 🧠 Verificar se memória foi atualizada
+            const memoryUpdated = data.memory_updated || data.memories_updated || false;
+            if (memoryUpdated) {
+                console.log('✅ [MEMÓRIA] Memória do usuário atualizada pelo Agno AI');
+            }
+
             return {
                 success: true,
                 response: responseText,
                 session_id: data.session_id,
+                memory_updated: memoryUpdated, // ← NOVO: indica se memória foi salva
                 metadata: {
                     agent_id: agentId,
                     run_id: data.run_id,
                     session_id: data.session_id,
                     model: data.model || data.model_provider,
                     tokens_used: data.tokens_used || data.metrics?.total_tokens,
+                    memory_updated: memoryUpdated,
                     timestamp: new Date().toISOString()
                 }
             };
@@ -2303,5 +2315,187 @@ async function chamarAgnoAI(message, usuario_id, intencao, nlp) {
     // Se chegou aqui, todas as tentativas falharam
     throw lastError;
 }
+
+// ============================================================
+// 🧠 ENDPOINTS DE GESTÃO DE MEMÓRIA (Sistema Agno AI)
+// ============================================================
+
+/**
+ * 🧠 GET /api/agno/memories/:userId
+ * Busca as memórias que o Matias tem sobre um usuário específico
+ * As memórias são armazenadas e gerenciadas pelo Agno AI (não pelo backend OFIX)
+ */
+router.get('/memories/:userId', verificarAuth, async (req, res) => {
+    try {
+        const { userId } = req.params;
+        
+        // 🔐 Validar que usuário só acessa suas próprias memórias (segurança)
+        const requestUserId = req.user?.id || req.user?.userId;
+        if (userId !== requestUserId.toString()) {
+            console.warn(`⚠️ [MEMÓRIA] Tentativa de acesso não autorizado - User ${requestUserId} tentou acessar memórias de ${userId}`);
+            return res.status(403).json({ 
+                success: false,
+                error: 'Acesso negado - você só pode ver suas próprias memórias' 
+            });
+        }
+        
+        const agnoUserId = `user_${userId}`;
+        console.log(`🔍 [MEMÓRIA] Buscando memórias para: ${agnoUserId}`);
+        
+        // Verificar se Agno AI está configurado
+        if (AGNO_API_URL === 'http://localhost:8000') {
+            return res.json({
+                success: true,
+                memories: [],
+                total: 0,
+                message: 'Sistema de memória não disponível em modo de desenvolvimento'
+            });
+        }
+        
+        const response = await fetch(
+            `${AGNO_API_URL}/memories?user_id=${agnoUserId}`,
+            {
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...(AGNO_API_TOKEN && { 'Authorization': `Bearer ${AGNO_API_TOKEN}` })
+                },
+                signal: AbortSignal.timeout(10000) // 10 segundos timeout
+            }
+        );
+        
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+        }
+        
+        const data = await response.json();
+        const memories = data.memories || data.results || [];
+        
+        console.log(`✅ [MEMÓRIA] ${memories.length} memórias encontradas para user_${userId}`);
+        
+        return res.json({
+            success: true,
+            memories: memories,
+            total: memories.length,
+            user_id: agnoUserId
+        });
+        
+    } catch (error) {
+        console.error('❌ [MEMÓRIA] Erro ao buscar memórias:', error);
+        return res.status(500).json({ 
+            success: false,
+            error: 'Erro ao buscar memórias do assistente',
+            details: error.message 
+        });
+    }
+});
+
+/**
+ * 🗑️ DELETE /api/agno/memories/:userId
+ * Limpa as memórias de um usuário (LGPD/GDPR compliance)
+ * Permite que usuário exerça direito ao esquecimento
+ */
+router.delete('/memories/:userId', verificarAuth, async (req, res) => {
+    try {
+        const { userId } = req.params;
+        
+        // 🔐 Validar acesso
+        const requestUserId = req.user?.id || req.user?.userId;
+        if (userId !== requestUserId.toString()) {
+            console.warn(`⚠️ [MEMÓRIA] Tentativa de exclusão não autorizada - User ${requestUserId} tentou excluir memórias de ${userId}`);
+            return res.status(403).json({ 
+                success: false,
+                error: 'Acesso negado' 
+            });
+        }
+        
+        const agnoUserId = `user_${userId}`;
+        console.log(`🗑️ [MEMÓRIA] Excluindo memórias para: ${agnoUserId}`);
+        
+        // Verificar se Agno AI está configurado
+        if (AGNO_API_URL === 'http://localhost:8000') {
+            return res.json({
+                success: true,
+                message: 'Sistema de memória não disponível em modo de desenvolvimento'
+            });
+        }
+        
+        const response = await fetch(
+            `${AGNO_API_URL}/memories?user_id=${agnoUserId}`,
+            {
+                method: 'DELETE',
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...(AGNO_API_TOKEN && { 'Authorization': `Bearer ${AGNO_API_TOKEN}` })
+                },
+                signal: AbortSignal.timeout(10000)
+            }
+        );
+        
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+        }
+        
+        console.log(`✅ [MEMÓRIA] Memórias excluídas com sucesso para user_${userId}`);
+        
+        return res.json({
+            success: true,
+            message: 'Memórias excluídas com sucesso. O assistente não se lembrará mais das conversas anteriores.',
+            user_id: agnoUserId
+        });
+        
+    } catch (error) {
+        console.error('❌ [MEMÓRIA] Erro ao excluir memórias:', error);
+        return res.status(500).json({ 
+            success: false,
+            error: 'Erro ao excluir memórias',
+            details: error.message 
+        });
+    }
+});
+
+/**
+ * 📊 GET /api/agno/memory-status
+ * Verifica se o sistema de memória está ativo e funcionando
+ */
+router.get('/memory-status', async (req, res) => {
+    try {
+        // Verificar se Agno AI está configurado
+        const isConfigured = AGNO_API_URL !== 'http://localhost:8000';
+        
+        if (!isConfigured) {
+            return res.json({
+                enabled: false,
+                status: 'disabled',
+                message: 'Sistema de memória não disponível em desenvolvimento'
+            });
+        }
+        
+        // Testar conexão com endpoint de memória
+        const response = await fetch(`${AGNO_API_URL}/health`, {
+            signal: AbortSignal.timeout(5000)
+        });
+        
+        const isOnline = response.ok;
+        
+        return res.json({
+            enabled: isOnline,
+            status: isOnline ? 'active' : 'unavailable',
+            agno_url: AGNO_API_URL,
+            message: isOnline 
+                ? 'Sistema de memória ativo - Matias lembra das suas conversas' 
+                : 'Sistema temporariamente indisponível',
+            timestamp: new Date().toISOString()
+        });
+        
+    } catch (error) {
+        console.error('❌ [MEMÓRIA] Erro ao verificar status:', error);
+        return res.json({
+            enabled: false,
+            status: 'error',
+            message: 'Erro ao verificar sistema de memória',
+            details: error.message
+        });
+    }
+});
 
 export default router;

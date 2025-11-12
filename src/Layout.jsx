@@ -41,7 +41,7 @@ const NAVIGATION_ITEMS = [
     { title: "Clientes", url: "/clientes", icon: Users, description: "Gestão de clientes" },
     { title: "Estoque", url: "/estoque", icon: Package, description: "Controle de peças" },
     { title: "Financeiro", url: "/financeiro", icon: DollarSign, description: "Gestão financeira" },
-    { title: "Assistente IA", url: "/assistente-ia", icon: Brain, description: "Inteligência artificial" },
+    { title: "Assistente IA", url: "/assistente-ia", icon: Brain, description: "Inteligência artificial com memória" },
     { title: "Configurações", url: "/configuracoes", icon: Settings, description: "Base de conhecimento" },
 ];
 

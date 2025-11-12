@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { User, Bot, CheckCircle, Loader2, AlertCircle, Volume2, VolumeX, Trash2, Settings, MessageSquare, Wrench, MicOff, Mic, Send } from 'lucide-react';
+import { User, Bot, CheckCircle, Loader2, AlertCircle, Volume2, VolumeX, Trash2, Settings, MessageSquare, Wrench, MicOff, Mic, Send, Brain, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useAuth } from '../context/AuthContext.jsx';
@@ -15,9 +15,15 @@ import { useAuthHeaders } from '../hooks/useAuthHeaders';
 import { AI_CONFIG } from '../constants/aiPageConfig';
 import { enrichMessage } from '../utils/nlp/queryParser';
 
+// ✨ NOVOS IMPORTS - Fase 1: Design System
+import '../styles/matias-design-system.css';
+import '../styles/matias-animations.css';
+
 /**
  * Página dedicada para interação com o Assistente de IA (Agno Agent)
  * Interface principal para comunicação com o agente inteligente
+ * 
+ * 🎨 Fase 1: Melhorias Visuais Aplicadas
  */
 const AIPage = () => {
   const { user } = useAuth();
@@ -98,6 +104,11 @@ const AIPage = () => {
   const [modalClienteAberto, setModalClienteAberto] = useState(false);
   const [clientePrePreenchido, setClientePrePreenchido] = useState(null);
 
+  // 🧠 NOVOS ESTADOS - Sistema de Memória
+  const [memoriaAtiva, setMemoriaAtiva] = useState(false);
+  const [memorias, setMemorias] = useState([]);
+  const [loadingMemorias, setLoadingMemorias] = useState(false);
+  const [mostrarMemorias, setMostrarMemorias] = useState(false);
 
   const chatContainerRef = useRef(null);
   const inputRef = useRef(null);
@@ -610,6 +621,107 @@ const AIPage = () => {
     
     return actions.length > 0 ? actions : null;
   };
+
+  // ============================================
+  // 🧠 SISTEMA DE MEMÓRIA
+  // ============================================
+
+  // Verificar se memória está ativa ao carregar página
+  useEffect(() => {
+    const verificarMemoria = async () => {
+      try {
+        const authHeaders = getAuthHeaders();
+        const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:1000';
+        const API_BASE = API_BASE_URL.replace('/api', '');
+
+        const response = await fetch(`${API_BASE}/agno/memory-status`, {
+          headers: authHeaders
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          setMemoriaAtiva(data.enabled || false);
+          
+          if (data.enabled) {
+            logger.info('Sistema de memória ativo', { status: data.status });
+          }
+        }
+      } catch (error) {
+        logger.warn('Não foi possível verificar sistema de memória', { error: error.message });
+      }
+    };
+
+    verificarMemoria();
+  }, [getAuthHeaders]);
+
+  // Carregar memórias do usuário
+  const carregarMemorias = useCallback(async () => {
+    if (!user?.id || !memoriaAtiva) return;
+
+    setLoadingMemorias(true);
+    try {
+      const authHeaders = getAuthHeaders();
+      const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:1000';
+      const API_BASE = API_BASE_URL.replace('/api', '');
+
+      const response = await fetch(`${API_BASE}/agno/memories/${user.id}`, {
+        headers: authHeaders
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setMemorias(data.memories || []);
+        logger.info('Memórias carregadas', { total: data.total });
+      }
+    } catch (error) {
+      logger.error('Erro ao carregar memórias', { error: error.message });
+      showToast('Erro ao carregar memórias', 'error');
+    } finally {
+      setLoadingMemorias(false);
+    }
+  }, [user?.id, memoriaAtiva, getAuthHeaders, showToast]);
+
+  // Excluir todas as memórias (LGPD)
+  const excluirMemorias = useCallback(async () => {
+    if (!user?.id) return;
+
+    const confirmacao = window.confirm(
+      '⚠️ Tem certeza que deseja excluir todas as memórias?\n\n' +
+      'O assistente Matias esquecerá todas as suas conversas anteriores.\n\n' +
+      'Esta ação não pode ser desfeita.'
+    );
+
+    if (!confirmacao) return;
+
+    try {
+      const authHeaders = getAuthHeaders();
+      const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:1000';
+      const API_BASE = API_BASE_URL.replace('/api', '');
+
+      const response = await fetch(`${API_BASE}/agno/memories/${user.id}`, {
+        method: 'DELETE',
+        headers: authHeaders
+      });
+
+      if (response.ok) {
+        setMemorias([]);
+        showToast('Memórias excluídas com sucesso', 'success');
+        logger.info('Memórias excluídas pelo usuário', { userId: user.id });
+      } else {
+        throw new Error('Falha ao excluir memórias');
+      }
+    } catch (error) {
+      logger.error('Erro ao excluir memórias', { error: error.message });
+      showToast('Erro ao excluir memórias', 'error');
+    }
+  }, [user?.id, getAuthHeaders, showToast]);
+
+  // Carregar memórias quando mostrar seção
+  useEffect(() => {
+    if (mostrarMemorias && memoriaAtiva) {
+      carregarMemorias();
+    }
+  }, [mostrarMemorias, memoriaAtiva, carregarMemorias]);
 
   // ============================================
   // ENVIAR MENSAGEM
@@ -1257,50 +1369,55 @@ const AIPage = () => {
 
   return (
     <div className="h-full flex flex-col bg-gradient-to-br from-slate-50 to-blue-50 p-2">
-      {/* Header */}
-      <div className="bg-white rounded-xl shadow-sm border border-slate-200/60 p-4 mb-4">
+      {/* Header - 🎨 Melhorado com Gradiente Moderno */}
+      <div className="bg-gradient-to-r from-blue-600 to-purple-600 rounded-xl shadow-lg border-0 p-4 mb-4 matias-animate-fade-in">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-purple-600 rounded-lg flex items-center justify-center">
-              <Bot className="w-6 h-6 text-white" />
+            <div className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center backdrop-blur-sm">
+              <Wrench className="w-6 h-6 text-white" />
             </div>
             <div>
-              <h1 className="text-xl font-bold text-slate-900">Assistente IA OFIX</h1>
-              <p className="text-sm text-slate-600">Powered by Agno AI Agent</p>
+              <h1 className="text-xl font-bold text-white flex items-center gap-2">
+                Assistente IA OFIX
+                <span className="text-xs font-normal bg-white/20 px-2 py-0.5 rounded-full">AI v2.0</span>
+              </h1>
+              <p className="text-sm text-blue-100">🎯 Seu especialista em oficina mecânica</p>
             </div>
           </div>
 
           <div className="flex items-center gap-4">
-            {/* Status da Conexão - Melhorado */}
-            <div className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-all duration-300 ${
-              statusConexao === 'conectado' ? 'bg-green-50 border border-green-200' :
-              statusConexao === 'conectando' ? 'bg-yellow-50 border border-yellow-200' :
-              statusConexao === 'erro' ? 'bg-red-50 border border-red-200' :
-              'bg-slate-50 border border-slate-200'
+            {/* 🧠 Indicador de Memória Ativa */}
+            {memoriaAtiva && (
+              <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-green-500/20 border border-green-300/30 backdrop-blur-sm">
+                <Brain className="w-4 h-4 text-green-100" />
+                <span className="text-sm font-medium text-green-100">Matias lembra de você</span>
+              </div>
+            )}
+            {/* Status da Conexão - 🎨 Melhorado para Header com Gradiente */}
+            <div className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-all duration-300 bg-white/10 backdrop-blur-sm border ${
+              statusConexao === 'conectado' ? 'border-green-300/30' :
+              statusConexao === 'conectando' ? 'border-yellow-300/30' :
+              statusConexao === 'erro' ? 'border-red-300/30' :
+              'border-white/20'
             }`}>
               <div className="relative">
-                {getStatusIcon()}
+                <div className="text-white">{getStatusIcon()}</div>
                 {statusConexao === 'conectado' && (
-                  <span className="absolute -top-1 -right-1 w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+                  <span className="absolute -top-1 -right-1 w-2 h-2 bg-green-400 rounded-full animate-pulse" />
                 )}
               </div>
-              <span className={`text-sm font-medium ${
-                statusConexao === 'conectado' ? 'text-green-700' :
-                statusConexao === 'conectando' ? 'text-yellow-700' :
-                statusConexao === 'erro' ? 'text-red-700' :
-                'text-slate-700'
-              }`}>
+              <span className="text-sm font-medium text-white">
                 {getStatusText()}
               </span>
             </div>
 
-            {/* Botões de Ação */}
+            {/* Botões de Ação - 🎨 Estilo Moderno para Header com Gradiente */}
             <div className="flex items-center gap-2">
               <Button
                 variant="outline"
                 size="sm"
                 onClick={alternarVoz}
-                className={`flex items-center gap-2 ${vozHabilitada ? 'text-green-600 hover:bg-green-50' : 'text-gray-600 hover:bg-gray-50'}`}
+                className={`flex items-center gap-2 bg-white/10 border-white/20 backdrop-blur-sm hover:bg-white/20 transition-all ${vozHabilitada ? 'text-white' : 'text-white/60'}`}
                 title={vozHabilitada ? 'Desativar voz' : 'Ativar voz'}
               >
                 {vozHabilitada ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
@@ -1311,7 +1428,7 @@ const AIPage = () => {
                   variant="outline"
                   size="sm"
                   onClick={pararFala}
-                  className="text-red-600 hover:bg-red-50"
+                  className="bg-white/10 border-white/20 text-white backdrop-blur-sm hover:bg-white/20 animate-pulse"
                   title="Parar fala"
                 >
                   <VolumeX className="w-4 h-4" />
@@ -1322,7 +1439,7 @@ const AIPage = () => {
                 variant="outline"
                 size="sm"
                 onClick={limparHistorico}
-                className="flex items-center gap-2 text-red-600 hover:bg-red-50"
+                className="flex items-center gap-2 bg-white/10 border-white/20 text-white backdrop-blur-sm hover:bg-white/20 transition-all"
                 title="Limpar histórico"
               >
                 <Trash2 className="w-4 h-4" />
@@ -1332,20 +1449,20 @@ const AIPage = () => {
                 variant="outline"
                 size="sm"
                 onClick={() => setMostrarConfig(!mostrarConfig)}
-                className="flex items-center gap-2"
+                className="flex items-center gap-2 bg-white/10 border-white/20 text-white backdrop-blur-sm hover:bg-white/20 transition-all"
                 title="Configurações de voz"
               >
                 <Settings className="w-4 h-4" />
               </Button>
             </div>
 
-            {/* Botão de Reconectar */}
+            {/* Botão de Reconectar - 🎨 Estilo Moderno */}
             <Button
               variant="outline"
               size="sm"
               onClick={verificarConexao}
               disabled={statusConexao === 'conectando'}
-              className="flex items-center gap-2"
+              className="flex items-center gap-2 bg-white/10 border-white/20 text-white backdrop-blur-sm hover:bg-white/20 transition-all disabled:opacity-50"
             >
               <Settings className="w-4 h-4" />
               Reconectar
@@ -1466,12 +1583,90 @@ const AIPage = () => {
         </div>
       )}
 
+      {/* 🧠 Card de Memórias */}
+      {memoriaAtiva && (
+        <div className="bg-white rounded-xl shadow-sm border border-blue-200 p-4 mb-4 matias-animate-fade-in">
+          <div className="flex items-center justify-between mb-3">
+            <button
+              onClick={() => setMostrarMemorias(!mostrarMemorias)}
+              className="flex items-center gap-2 text-blue-900 font-semibold hover:text-blue-700 transition-colors"
+            >
+              <Brain className="w-5 h-5" />
+              <span>O que o Matias lembra sobre você</span>
+              <span className="text-xs bg-blue-100 px-2 py-0.5 rounded-full">
+                {memorias.length}
+              </span>
+            </button>
+            
+            <div className="flex items-center gap-2">
+              {mostrarMemorias && (
+                <>
+                  <Button
+                    onClick={carregarMemorias}
+                    variant="ghost"
+                    size="sm"
+                    disabled={loadingMemorias}
+                    className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                    title="Atualizar memórias"
+                  >
+                    <RefreshCw className={`w-4 h-4 ${loadingMemorias ? 'animate-spin' : ''}`} />
+                  </Button>
+                  
+                  <Button
+                    onClick={excluirMemorias}
+                    variant="ghost"
+                    size="sm"
+                    className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                    title="Esquecer minhas conversas (LGPD)"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </Button>
+                </>
+              )}
+            </div>
+          </div>
+
+          {mostrarMemorias && (
+            <div className="mt-3 pt-3 border-t border-blue-100">
+              {loadingMemorias ? (
+                <div className="flex items-center justify-center py-4">
+                  <Loader2 className="w-5 h-5 text-blue-500 animate-spin" />
+                  <span className="ml-2 text-sm text-gray-600">Carregando memórias...</span>
+                </div>
+              ) : memorias.length > 0 ? (
+                <ul className="space-y-2">
+                  {memorias.map((memoria, idx) => (
+                    <li key={idx} className="flex items-start gap-2 text-sm text-gray-700">
+                      <span className="text-blue-500 mt-1">•</span>
+                      <span>{memoria.memory || memoria.content || JSON.stringify(memoria)}</span>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <div className="text-center py-4">
+                  <p className="text-sm text-gray-600 italic">
+                    Ainda não há memórias salvas.
+                  </p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Continue conversando com o Matias!
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Área de Chat */}
       <div className="flex-1 bg-white rounded-xl shadow-sm border border-slate-200/60 flex flex-col overflow-hidden">
-        {/* Container de Mensagens */}
+        {/* Container de Mensagens - 💬 Com Scrollbar Personalizada */}
         <div
           ref={chatContainerRef}
-          className="flex-1 overflow-y-auto p-4 space-y-4"
+          className="flex-1 overflow-y-auto p-4 space-y-4 matias-animate-fade-in"
+          style={{
+            scrollbarWidth: 'thin',
+            scrollbarColor: '#cbd5e1 transparent'
+          }}
         >
 
           {conversas.map((conversa) => (
@@ -1480,9 +1675,9 @@ const AIPage = () => {
               className={`flex gap-3 ${conversa.tipo === 'usuario' ? 'justify-end' : 'justify-start'
                 }`}
             >
-              {/* Avatar */}
+              {/* Avatar - 🎨 Com Efeito Moderno */}
               {conversa.tipo !== 'usuario' && (
-                <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${conversa.tipo === 'confirmacao' || conversa.tipo === 'sistema'
+                <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 shadow-sm matias-animate-bounce-in ${conversa.tipo === 'confirmacao' || conversa.tipo === 'sistema'
                   ? 'bg-gradient-to-br from-green-500 to-emerald-500'
                   : conversa.tipo === 'erro'
                     ? 'bg-gradient-to-br from-red-500 to-orange-500'
@@ -1510,9 +1705,9 @@ const AIPage = () => {
                 </div>
               )}
 
-              {/* Mensagem */}
+              {/* Mensagem - 💬 Design Moderno com Animações */}
               <div
-                className={`max-w-2xl rounded-2xl px-4 py-3 ${conversa.tipo === 'usuario'
+                className={`max-w-2xl rounded-2xl px-4 py-3 shadow-sm matias-animate-message-slide transition-all duration-200 hover:shadow-md ${conversa.tipo === 'usuario'
                   ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white'
                   : conversa.tipo === 'confirmacao' || conversa.tipo === 'sistema'
                     ? 'bg-gradient-to-r from-green-50 to-emerald-50 text-green-800 border border-green-200'
@@ -1524,7 +1719,7 @@ const AIPage = () => {
                           ? 'bg-gradient-to-r from-purple-50 to-indigo-50 text-purple-800 border border-purple-200'
                           : conversa.tipo === 'consulta_cliente'
                             ? 'bg-gradient-to-r from-cyan-50 to-blue-50 text-cyan-900 border border-cyan-200'
-                            : 'bg-slate-100 text-slate-900 border border-slate-200'
+                            : 'bg-white text-slate-900 border border-slate-200'
                   }`}
               >
                 <div className="whitespace-pre-wrap text-sm leading-relaxed">
@@ -1809,8 +2004,8 @@ const AIPage = () => {
           </div>
         )}
 
-        {/* Input de Mensagem */}
-        <div className="border-t border-slate-200 p-4 bg-slate-50/50">
+        {/* Input de Mensagem - ✨ Design Moderno */}
+        <div className="border-t border-slate-200 p-4 bg-white">
           <div className="flex gap-3 items-end">
             <div className="flex-1">
               <Input
@@ -1830,7 +2025,7 @@ const AIPage = () => {
                    "Digite sua mensagem...") : 
                   "Digite sua pergunta ou solicitação..."}
                 disabled={carregando || statusConexao !== 'conectado' || gravando}
-                className="resize-none border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 rounded-xl"
+                className="resize-none border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 rounded-xl transition-all duration-200 shadow-sm focus:shadow-md"
               />
               {/* ✅ CONTADOR DE CARACTERES */}
               <div className={`text-xs mt-1 ${mensagem.length > AI_CONFIG.CHAT.MAX_MESSAGE_LENGTH ? 'text-red-600' : 'text-slate-500'}`}>
