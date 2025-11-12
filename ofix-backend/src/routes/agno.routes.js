@@ -1814,11 +1814,13 @@ async function processarComAgnoAI(message, userId, agentId = 'oficinaia', sessio
     // 🧠 Preparar payload JSON com suporte a MEMÓRIA
     const payload = {
         message: message,
+        agent_id: agentId || 'oficinaia', // ← OBRIGATÓRIO: ID do agente Agno AI
         user_id: `user_${userId}`, // ← Formato: user_123 (para sistema de memória)
         session_id: session_id || `session_${Date.now()}` // ← Criar session_id se não existir
     };
 
     console.log('🧠 [MEMÓRIA] Enviando com IDs:', { 
+        agent_id: payload.agent_id,
         user_id: payload.user_id, 
         session_id: payload.session_id 
     });
