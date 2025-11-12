@@ -155,7 +155,7 @@ router.post('/chat-public', async (req, res) => {
         console.log('🔌 Tentando conectar com Agno:', AGNO_API_URL);
 
         try {
-            const response = await fetch(`${AGNO_API_URL}/chat`, {
+            const response = await fetch(`${AGNO_API_URL}/run`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -1824,7 +1824,7 @@ async function processarComAgnoAI(message, userId, agentId = 'oficinaia', sessio
     });
 
     try {
-        const response = await fetch(`${AGNO_API_URL}/chat`, {
+        const response = await fetch(`${AGNO_API_URL}/run`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -2047,7 +2047,7 @@ router.post('/chat-direct', verificarAuth, async (req, res) => {
             message: message
         };
 
-        const response = await fetch(`${AGNO_API_URL}/chat`, {
+        const response = await fetch(`${AGNO_API_URL}/run`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
