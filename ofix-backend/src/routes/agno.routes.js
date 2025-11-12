@@ -86,7 +86,7 @@ router.get('/config', async (req, res) => {
             configured: !!AGNO_API_URL && AGNO_API_URL !== 'http://localhost:8000',
             agno_url: AGNO_API_URL,
             has_token: !!AGNO_API_TOKEN,
-            agent_id: process.env.AGNO_DEFAULT_AGENT_ID || 'oficinaia',
+            agent_id: process.env.AGNO_DEFAULT_AGENT_ID || 'matias',
             warmed: agnoWarmed,
             memory_enabled: memoryEnabled, // ← NOVO: indica se memória está ativa
             last_warming: lastWarmingAttempt ? new Date(lastWarmingAttempt).toISOString() : null,
@@ -145,7 +145,7 @@ router.post('/chat-public', async (req, res) => {
         if (AGNO_API_URL === 'http://localhost:8000') {
             return res.json({
                 success: true,
-                response: `🤖 **Modo Demonstração Ativado**\n\nVocê disse: "${message}"\n\n📋 **Status**: Agente Matias não configurado no ambiente de produção.\n\n⚙️ **Configuração necessária no Render:**\n- AGNO_API_URL=https://matias-agno-assistant.onrender.com\n- AGNO_DEFAULT_AGENT_ID=oficinaia\n\n💡 Após configurar, o assistente conectará com seu agente real!`,
+                response: `🤖 **Modo Demonstração Ativado**\n\nVocê disse: "${message}"\n\n📋 **Status**: Agente Matias não configurado no ambiente de produção.\n\n⚙️ **Configuração necessária no Render:**\n- AGNO_API_URL=https://matias-agno-assistant.onrender.com\n- AGNO_DEFAULT_AGENT_ID=matias\n\n💡 Após configurar, o assistente conectará com seu agente real!`,
                 mode: 'demo',
                 agno_configured: false
             });
@@ -1621,7 +1621,7 @@ router.post('/chat', verificarAuth, async (req, res) => {
 
         // Verificar se temos user_id válido
         const userId = req.user?.id || req.user?.userId || 'anonymous';
-        const agentId = agent_id || 'oficinaia'; // Usar oficinaia por padrão, mas permitir override
+        const agentId = agent_id || 'matias'; // Usar matias por padrão, mas permitir override
 
         console.log('💬 [CHAT] Nova mensagem recebida:', {
             user: req.user.email,
@@ -1783,7 +1783,7 @@ async function processarAcaoLocal(message, actionType, userId, contexto_ativo) {
 /**
  * Processa mensagem com Agno AI (mantém lógica original)
  */
-async function processarComAgnoAI(message, userId, agentId = 'oficinaia', session_id = null) {
+async function processarComAgnoAI(message, userId, agentId = 'matias', session_id = null) {
     console.log('🧠 [AGNO_AI] Conectando com Agno...');
 
     // ⚡ Verificar Circuit Breaker
@@ -1814,7 +1814,7 @@ async function processarComAgnoAI(message, userId, agentId = 'oficinaia', sessio
     // 🧠 Preparar payload JSON com suporte a MEMÓRIA
     const payload = {
         message: message,
-        agent_id: agentId || 'oficinaia', // ← OBRIGATÓRIO: ID do agente Agno AI
+        agent_id: agentId || 'matias', // ← OBRIGATÓRIO: ID do agente Agno AI
         user_id: `user_${userId}`, // ← Formato: user_123 (para sistema de memória)
         session_id: session_id || `session_${Date.now()}` // ← Criar session_id se não existir
     };
@@ -2044,7 +2044,7 @@ router.post('/chat-direct', verificarAuth, async (req, res) => {
             return res.status(400).json({ error: 'Mensagem é obrigatória' });
         }
 
-        const agentId = agent_id || 'oficinaia';
+        const agentId = agent_id || 'matias';
 
         console.log('🎯 Teste direto - sem user_id específico:', {
             agent_id: agentId,
@@ -2106,7 +2106,7 @@ router.post('/chat-direct', verificarAuth, async (req, res) => {
 router.post('/chat-strict', verificarAuth, async (req, res) => {
     try {
         const { message, session_id } = req.body;
-        const agentId = 'oficinaia';
+        const agentId = 'matias';
 
         console.log('🎯 Chat-strict iniciado - instruções rigorosas');
         console.log('📝 Mensagem original:', message);
