@@ -270,7 +270,7 @@ router.post('/chat-inteligente', async (req, res) => {
             console.log('🧠 [AGNO_AI] Enviando para Agno AI...');
             
             try {
-                responseData = await processarComAgnoAI(message, usuario_id, 'oficinaia', null);
+                responseData = await processarComAgnoAI(message, usuario_id, 'matias', null);
                 
                 const duration = Date.now() - startTime;
                 console.log(`✅ [AGNO_AI] Processado em ${duration}ms`);
@@ -1966,7 +1966,7 @@ router.post('/chat-debug', verificarAuth, async (req, res) => {
         }
 
         const userId = req.user?.id || req.user?.userId || 'anonymous';
-        const agentId = agent_id || 'oficinaia';
+        const agentId = agent_id || 'matias';
 
         console.log('🔍 Debug - Testando com parâmetros personalizados:', {
             user: req.user.email,
