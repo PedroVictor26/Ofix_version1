@@ -39,10 +39,12 @@ class MessageClassifier {
       CONSULTA_OS: {
         keywords: [
           'status da os', 'ordem de serviço', 'ordem de servico',
-          'os número', 'os numero', 'os #', 'meu carro',
-          'status do', 'andamento', 'situação', 'situacao',
-          'está pronto', 'esta pronto', 'terminado', 'concluído', 'concluido',
-          'meu veículo', 'meu veiculo', 'minha moto', 'meu caminhão'
+          'os número', 'os numero', 'os #',
+          'status do serviço', 'status do servico',
+          'andamento da os', 'andamento do serviço',
+          'está pronto', 'esta pronto', 'já terminou', 'ja terminou',
+          'quando fica pronto', 'previsão de entrega', 'previsao de entrega',
+          'consultar os', 'ver os', 'verificar os'
         ],
         confidence: 0.9,
         requiresDB: true,
