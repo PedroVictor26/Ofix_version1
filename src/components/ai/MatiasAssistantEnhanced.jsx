@@ -20,18 +20,27 @@ import {
 } from 'lucide-react';
 
 // Import design system styles
-import '../styles/matias-design-system.css';
-import '../styles/matias-animations.css';
+import '../../styles/matias-design-system.css';
+import '../../styles/matias-animations.css';
 
 const MatiasAssistantEnhanced = ({
     position = 'bottom-right',
     theme = 'auto',
     language = 'pt-BR',
     onAction = () => {},
-    customConfig = {}
+    customConfig = {},
+    isOpen: isOpenProp = false,
+    isFullscreen = false
 }) => {
     // Core state management
-    const [isOpen, setIsOpen] = useState(false);
+    const [isOpen, setIsOpen] = useState(isOpenProp || isFullscreen);
+    
+    // Auto-open if fullscreen mode
+    useEffect(() => {
+        if (isFullscreen) {
+            setIsOpen(true);
+        }
+    }, [isFullscreen]);
     const [isMinimized, setIsMinimized] = useState(false);
     const [isExpanded, setIsExpanded] = useState(false);
     const [messages, setMessages] = useState([]);
@@ -1256,12 +1265,12 @@ const MatiasAssistantEnhanced = ({
     }
 
     return (
-        <div className={`fixed ${getPositionClasses()} z-40 w-full max-w-md`}>
+        <div className={`${isFullscreen ? 'w-full h-full' : `fixed ${getPositionClasses()} w-full max-w-md`} z-40`}>
             <div className={`
-                bg-white rounded-2xl shadow-2xl border border-gray-200 overflow-hidden
-                ${isMinimized ? 'h-16' : 'h-[600px]'}
-                ${isExpanded ? 'max-w-2xl' : ''}
-                transition-all duration-300 matias-animate-chat-open
+                bg-white ${isFullscreen ? 'rounded-none' : 'rounded-2xl'} ${isFullscreen ? 'shadow-none' : 'shadow-2xl'} border border-gray-200 overflow-hidden
+                ${isMinimized ? 'h-16' : isFullscreen ? 'h-full' : 'h-[600px]'}
+                ${isExpanded || isFullscreen ? 'max-w-full' : ''}
+                transition-all duration-300 ${isFullscreen ? '' : 'matias-animate-chat-open'}
                 ${highContrastMode ? 'border-4 border-black' : ''}
             `}>
                 {/* Header */}

@@ -4,7 +4,7 @@
  */
 
 // Configuração da URL base da API com fallbacks robustos
-const getApiBaseUrl = () => {
+export const getApiBaseUrl = () => {
   // Debug: Log das variáveis disponíveis
   console.log('🔍 API Utils - Detectando ambiente:', {
     hasViteEnv: !!import.meta.env,
@@ -127,4 +127,4 @@ export const testMatiasConnection = async (user_id = 'connection_test') => {
   }
 };
 
-export default { apiCall, chatWithMatias, testMatiasConnection };
+export default { apiCall, chatWithMatias, testMatiasConnection, getApiBaseUrl };
