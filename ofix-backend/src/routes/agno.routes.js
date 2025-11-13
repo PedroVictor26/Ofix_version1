@@ -1868,18 +1868,60 @@ async function processarComAgnoAI(message, userId, agentId = 'matias', session_i
     // ⚡ Verificar Circuit Breaker
     if (!checkCircuitBreaker()) {
         const remainingMinutes = Math.ceil((circuitBreakerOpenUntil - Date.now()) / 60000);
+        console.log(`🚫 [CIRCUIT BREAKER] Agno AI bloqueado por ${remainingMinutes * 60}s (rate limit)`);
+        
+        // Gerar resposta inteligente baseada na mensagem
+        const msgLower = message.toLowerCase();
+        let fallbackResponse;
+        
+        // Orçamentos e preços
+        if (msgLower.includes('quanto') || msgLower.includes('preço') || msgLower.includes('custo') || 
+            msgLower.includes('valor') || msgLower.includes('óleo') || msgLower.includes('troca')) {
+            fallbackResponse = `💰 **Preços de Serviços - Tabela Rápida**\n\n` +
+                `**Serviços mais procurados:**\n` +
+                `🔧 Troca de óleo: R$ 80 - R$ 150\n` +
+                `🔧 Revisão completa: R$ 200 - R$ 500\n` +
+                `🔧 Alinhamento: R$ 80 - R$ 120\n` +
+                `🔧 Balanceamento: R$ 50 - R$ 80\n` +
+                `🔧 Freios (pastilhas): R$ 150 - R$ 300\n` +
+                `🔧 Filtro de ar: R$ 40 - R$ 80\n\n` +
+                `💡 **Valores variam por marca/modelo do veículo**\n\n` +
+                `📞 Para orçamento exato: (11) 1234-5678\n` +
+                `📧 Email: contato@ofix.com.br`;
+        }
+        // Freios e componentes
+        else if (msgLower.includes('freio') || msgLower.includes('pastilha') || msgLower.includes('disco')) {
+            fallbackResponse = `🛑 **Sistema de Freios**\n\n` +
+                `**Quando trocar:**\n` +
+                `• Pastilhas: A cada 30-40 mil km\n` +
+                `• Discos: A cada 60-80 mil km\n` +
+                `• Fluido: A cada 2 anos\n\n` +
+                `**Sinais de alerta:**\n` +
+                `⚠️ Ruído ao frear\n` +
+                `⚠️ Pedal macio ou duro demais\n` +
+                `⚠️ Vibração no pedal\n` +
+                `⚠️ Luz de freio acesa\n\n` +
+                `🔧 **Preço estimado:** R$ 150 - R$ 300 (pastilhas)\n\n` +
+                `📞 Agende inspeção: (11) 1234-5678`;
+        }
+        // Geral
+        else {
+            fallbackResponse = `⏳ **Assistente IA temporariamente limitado**\n\n` +
+                `Atingimos o limite diário de consultas ao sistema de IA.\n\n` +
+                `🔄 **Reset em:** ${remainingMinutes} minuto${remainingMinutes > 1 ? 's' : ''}\n\n` +
+                `💡 **Enquanto isso, posso ajudar com:**\n` +
+                `• Digite "agendar" para marcar serviço\n` +
+                `• Digite "status OS 123" para consultar ordem\n` +
+                `• Digite "tem peça X" para verificar estoque\n` +
+                `• Digite "ajuda" para ver menu completo\n\n` +
+                `📞 **Urgente?** Ligue: (11) 1234-5678\n` +
+                `📧 **Email:** contato@ofix.com.br`;
+        }
+        
         // Circuit breaker aberto - retornar fallback local imediatamente
         return {
             success: true,
-            response: `⏳ **Assistente temporariamente ocupado**\n\n` +
-                `Estou processando muitas solicitações no momento.\n\n` +
-                `🔄 **Tente novamente em ${remainingMinutes} minuto${remainingMinutes > 1 ? 's' : ''}**\n\n` +
-                `💡 **Enquanto isso, posso ajudar com:**\n` +
-                `• Digite "agendar" para marcar um serviço\n` +
-                `• Digite "status OS" para consultar ordem\n` +
-                `• Digite "tem peça X" para verificar estoque\n` +
-                `• Digite "ajuda" para ver mais opções\n\n` +
-                `📞 **Urgente?** Ligue: (11) 1234-5678`,
+            response: fallbackResponse,
             tipo: 'circuit_breaker_fallback',
             mode: 'local_fallback',
             metadata: {
