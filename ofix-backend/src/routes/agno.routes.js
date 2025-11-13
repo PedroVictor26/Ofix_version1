@@ -148,10 +148,26 @@ const publicLimiter = rateLimit({
         retry_after: '15 minutos'
     },
     standardHeaders: true,
-    legacyHeaders: false
+    legacyHeaders: false,
+    // Configuração para contar requests corretamente
+    keyGenerator: (req) => {
+        // Em produção, usa X-Forwarded-For; em local, usa IP real
+        const ip = req.headers['x-forwarded-for']?.split(',')[0] || 
+                   req.ip || 
+                   req.connection.remoteAddress;
+        console.log(`🔒 [RATE-LIMIT] Request de IP: ${ip}`);
+        return ip;
+    },
+    handler: (req, res) => {
+        console.log(`⛔ [RATE-LIMIT] Bloqueado IP: ${req.ip}`);
+        res.status(429).json({
+            error: 'Muitas requisições deste IP',
+            retry_after: '15 minutos'
+        });
+    }
 });
 
-// Endpoint público para testar chat SEM AUTENTICAÇÃO (com rate limit)
+// Endpoint público para testar chat SEM AUTENTICAÇÃO (com rate limit e cache)
 router.post('/chat-public', publicLimiter, validateMessage, async (req, res) => {
     try {
         const { message } = req.body;
@@ -172,38 +188,24 @@ router.post('/chat-public', publicLimiter, validateMessage, async (req, res) => 
             });
         }
 
-        // Testar conexão com Agno real
-        console.log('🔌 Tentando conectar com Agno:', AGNO_API_URL);
-
+        // Usar processarComAgnoAI para se beneficiar do cache
+        console.log('🔌 Processando com cache habilitado...');
+        
         try {
-            const response = await fetch(`${AGNO_API_URL}/run`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    ...(AGNO_API_TOKEN && { 'Authorization': `Bearer ${AGNO_API_TOKEN}` })
-                },
-                body: JSON.stringify({
-                    message: message,
-                    user_id: 'test_user'
-                }),
-                timeout: 15000 // 15 segundos
+            const result = await processarComAgnoAI(message, 'test_user', 'matias', null);
+            
+            const responseText = result.response || result.content || result.message || 'Resposta do agente Matias';
+
+            console.log(`✅ Sucesso na comunicação com Agno ${result.from_cache ? '(CACHE)' : '(API)'}`);
+            
+            res.json({
+                success: true,
+                response: responseText,
+                mode: 'production',
+                agno_configured: true,
+                from_cache: result.from_cache || false,
+                metadata: result
             });
-
-            if (response.ok) {
-                const data = await response.json();
-                const responseText = data.response || data.content || data.message || 'Resposta do agente Matias';
-
-                console.log('✅ Sucesso na comunicação com Agno');
-                res.json({
-                    success: true,
-                    response: responseText,
-                    mode: 'production',
-                    agno_configured: true,
-                    metadata: data
-                });
-            } else {
-                throw new Error(`Agno retornou status ${response.status}`);
-            }
         } catch (agnoError) {
             console.error('❌ Erro ao conectar com Agno:', agnoError.message);
 
