@@ -37,13 +37,13 @@ class ConsultasOSService {
                 }
             }
             
-            const ordensServico = await prisma.ordemServico.findMany({
+            const ordensServico = await prisma.servico.findMany({
                 where: whereClause,
                 include: {
                     cliente: {
                         select: {
                             id: true,
-                            nome: true,
+                            nomeCompleto: true,
                             telefone: true
                         }
                     },
@@ -52,21 +52,21 @@ class ConsultasOSService {
                             id: true,
                             marca: true,
                             modelo: true,
-                            ano: true,
+                            anoModelo: true,
                             placa: true
                         }
                     },
-                    servicos: {
+                    itensPeca: {
                         select: {
                             id: true,
-                            nome: true,
-                            valor: true,
-                            status: true
+                            quantidade: true,
+                            precoUnitarioCobrado: true,
+                            valorTotal: true
                         }
                     }
                 },
                 orderBy: {
-                    dataAbertura: 'desc'
+                    dataEntrada: 'desc'
                 }
             });
             
@@ -86,48 +86,46 @@ class ConsultasOSService {
             const whereClause = dataFiltro ? { dataAbertura: dataFiltro } : {};
             
             // Total de OS
-            const totalOS = await prisma.ordemServico.count({
+            const totalOS = await prisma.servico.count({
                 where: whereClause
             });
             
             // OS concluídas
-            const osConcluidas = await prisma.ordemServico.count({
+            const osConcluidas = await prisma.servico.count({
                 where: {
                     ...whereClause,
-                    status: 'CONCLUIDO'
+                    status: 'FINALIZADO'
                 }
             });
             
             // Receita total
-            const receitaResult = await prisma.ordemServico.aggregate({
+            const receitaResult = await prisma.servico.aggregate({
                 where: {
                     ...whereClause,
-                    status: 'CONCLUIDO'
+                    status: 'FINALIZADO'
                 },
                 _sum: {
-                    valorTotal: true
+                    valorTotalFinal: true
                 }
             });
             
-            // Serviços mais populares
+            // Serviços mais populares (pegar pelos procedimentos)
             const servicosPopulares = await prisma.servico.groupBy({
-                by: ['nome'],
-                where: {
-                    ordemServico: whereClause
-                },
+                by: ['status'],
+                where: whereClause,
                 _count: {
-                    nome: true
+                    status: true
                 },
                 orderBy: {
                     _count: {
-                        nome: 'desc'
+                        status: 'desc'
                     }
                 },
                 take: 5
             });
             
             // Clientes ativos
-            const clientesAtivos = await prisma.ordemServico.groupBy({
+            const clientesAtivos = await prisma.servico.groupBy({
                 by: ['clienteId'],
                 where: whereClause,
                 _count: {
@@ -139,11 +137,11 @@ class ConsultasOSService {
                 total_os: totalOS,
                 os_concluidas: osConcluidas,
                 os_pendentes: totalOS - osConcluidas,
-                receita_total: receitaResult._sum.valorTotal || 0,
+                receita_total: receitaResult._sum.valorTotalFinal || 0,
                 produtividade: totalOS > 0 ? ((osConcluidas / totalOS) * 100).toFixed(1) : 0,
                 servicos_populares: servicosPopulares.map(s => ({
-                    nome: s.nome,
-                    quantidade: s._count.nome
+                    status: s.status,
+                    quantidade: s._count.status
                 })),
                 clientes_ativos: clientesAtivos.length,
                 periodo
@@ -247,9 +245,9 @@ class ConsultasOSService {
             const amanha = new Date(hoje);
             amanha.setDate(hoje.getDate() + 1);
             
-            const osHoje = await prisma.ordemServico.count({
+            const osHoje = await prisma.servico.count({
                 where: {
-                    dataAbertura: {
+                    dataEntrada: {
                         gte: hoje,
                         lt: amanha
                     }

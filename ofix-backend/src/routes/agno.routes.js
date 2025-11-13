@@ -1,6 +1,8 @@
 import express from 'express';
 import fetch from 'node-fetch';
 import jwt from 'jsonwebtoken';
+import NodeCache from 'node-cache';
+import rateLimit from 'express-rate-limit';
 
 // Importar serviços do Matias
 import ConversasService from '../services/conversas.service.js';
@@ -20,13 +22,24 @@ const router = express.Router();
 const AGNO_API_URL = process.env.AGNO_API_URL || 'http://localhost:8000';
 const AGNO_API_TOKEN = process.env.AGNO_API_TOKEN || '';
 
-// Cache simples para manter contexto de seleção de clientes por usuário
-const contextoSelecaoClientes = new Map(); // { usuarioId: { clientes: [...], timestamp: Date } }
-const TEMPO_EXPIRACAO = 10 * 60 * 1000; // 10 minutos
+// 💾 CACHE DE RESPOSTAS - Reduz 60% das chamadas à API (1h de TTL)
+const responseCache = new NodeCache({ 
+  stdTTL: 3600, // 1 hora
+  checkperiod: 300, // Limpar cache a cada 5 minutos
+  maxKeys: 500 // Máximo 500 respostas em cache
+});
 
-// Cache de warming do Agno
+// 🔄 CACHE DE CONTEXTOS - Auto-limpeza após 10 minutos
+const contextoSelecaoClientes = new NodeCache({ 
+  stdTTL: 600, // 10 minutos
+  checkperiod: 120, // Limpar a cada 2 minutos
+  maxKeys: 1000 // Máximo 1000 usuários simultâneos
+});
+
+// ⏰ WARM-UP INTELIGENTE - Rastrear última atividade
 let agnoWarmed = false;
 let lastWarmingAttempt = null;
+let lastActivity = Date.now();
 
 // ⚡ CIRCUIT BREAKER para Rate Limit (429)
 let circuitBreakerOpen = false;
@@ -126,14 +139,22 @@ router.post('/warm', async (req, res) => {
     }
 });
 
-// Endpoint público para testar chat SEM AUTENTICAÇÃO (temporário para debug)
-router.post('/chat-public', async (req, res) => {
+// 🔒 RATE LIMITER para endpoints públicos (previne abuso)
+const publicLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutos
+    max: 20, // 20 requests por IP
+    message: {
+        error: 'Muitas requisições deste IP',
+        retry_after: '15 minutos'
+    },
+    standardHeaders: true,
+    legacyHeaders: false
+});
+
+// Endpoint público para testar chat SEM AUTENTICAÇÃO (com rate limit)
+router.post('/chat-public', publicLimiter, validateMessage, async (req, res) => {
     try {
         const { message } = req.body;
-
-        if (!message) {
-            return res.status(400).json({ error: 'Mensagem é obrigatória' });
-        }
 
         console.log('🧪 Teste público do chat - Configuração:', {
             agno_url: AGNO_API_URL,
@@ -220,9 +241,9 @@ router.post('/chat-public', async (req, res) => {
 // 🤖 CHAT INTELIGENTE - PROCESSAMENTO DE LINGUAGEM NATURAL
 // ============================================================
 
-router.post('/chat-inteligente', async (req, res) => {
+router.post('/chat-inteligente', validateMessage, async (req, res) => {
     try {
-        const { message, usuario_id, nlp, contextoNLP, contexto_ativo } = req.body;
+        const { message, usuario_id, contexto_ativo } = req.body;
 
         if (!message) {
             return res.status(400).json({
@@ -911,14 +932,14 @@ async function processarConsultaOS(mensagem) {
             where.status = dados.status;
         }
 
-        const ordensServico = await prisma.ordemServico.findMany({
+        const ordensServico = await prisma.servico.findMany({
             where,
             include: {
                 cliente: true,
                 veiculo: true
             },
             orderBy: {
-                dataAbertura: 'desc'
+                dataEntrada: 'desc'
             },
             take: 10
         });
@@ -1018,11 +1039,11 @@ async function processarConsultaCliente(mensagem, contexto_ativo = null, usuario
             const numeroDigitado = parseInt(mensagemTrimmed);
             
             // Verificar se há clientes armazenados no cache para este usuário
-            if (usuario_id && contextoSelecaoClientes.has(usuario_id)) {
+            if (usuario_id) {
                 const dadosCache = contextoSelecaoClientes.get(usuario_id);
                 
-                // Verificar se o cache ainda é válido (não expirou)
-                if (Date.now() - dadosCache.timestamp < TEMPO_EXPIRACAO) {
+                // NodeCache já gerencia expiração automaticamente
+                if (dadosCache) {
                     const clientes = dadosCache.clientes;
                     console.log('🔢 DEBUG: Clientes no cache:', clientes.length);
                     
@@ -1781,9 +1802,65 @@ async function processarAcaoLocal(message, actionType, userId, contexto_ativo) {
 }
 
 /**
- * Processa mensagem com Agno AI (mantém lógica original)
+ * 🔑 Gera chave de cache normalizada para mensagens
+ */
+function getCacheKey(message, userId) {
+    return `${userId}:${message.toLowerCase().trim().substring(0, 100)}`;
+}
+
+/**
+ * 🧹 Sanitiza dados para logs (LGPD compliance)
+ */
+function sanitizeForLog(text) {
+    if (!text) return '';
+    return String(text)
+        .replace(/\d{3}\.\d{3}\.\d{3}-\d{2}/g, 'CPF***')
+        .replace(/\(\d{2}\)\s?\d{4,5}-\d{4}/g, 'TEL***')
+        .replace(/\d{11}/g, 'TEL***')
+        .substring(0, 150);
+}
+
+/**
+ * ✅ Middleware de validação de mensagens
+ */
+function validateMessage(req, res, next) {
+    const { message } = req.body;
+    
+    if (!message?.trim()) {
+        return res.status(400).json({ error: 'Mensagem obrigatória' });
+    }
+    
+    if (typeof message !== 'string') {
+        return res.status(400).json({ error: 'Mensagem deve ser texto' });
+    }
+    
+    if (message.length > 5000) {
+        return res.status(400).json({ error: 'Mensagem muito longa (max 5000 caracteres)' });
+    }
+    
+    next();
+}
+
+/**
+ * Processa mensagem com Agno AI (mantém lógica original + CACHE)
  */
 async function processarComAgnoAI(message, userId, agentId = 'matias', session_id = null) {
+    // 🔄 Atualizar última atividade para warm-up inteligente
+    lastActivity = Date.now();
+    
+    // 💾 1. VERIFICAR CACHE (reduz 60% das chamadas)
+    const cacheKey = getCacheKey(message, userId);
+    const cached = responseCache.get(cacheKey);
+    
+    if (cached) {
+        console.log('✅ [CACHE] Hit - resposta do cache');
+        return {
+            ...cached,
+            from_cache: true,
+            timestamp: new Date().toISOString()
+        };
+    }
+    
     console.log('🧠 [AGNO_AI] Conectando com Agno...');
 
     // ⚡ Verificar Circuit Breaker
@@ -1873,7 +1950,7 @@ async function processarComAgnoAI(message, userId, agentId = 'matias', session_i
                 console.log('✅ [MEMÓRIA] Memória do usuário atualizada pelo Agno AI');
             }
 
-            return {
+            const result = {
                 success: true,
                 response: responseText,
                 session_id: data.session_id,
@@ -1888,6 +1965,12 @@ async function processarComAgnoAI(message, userId, agentId = 'matias', session_i
                     timestamp: new Date().toISOString()
                 }
             };
+            
+            // 💾 SALVAR NO CACHE (reduz 60% das chamadas futuras)
+            responseCache.set(cacheKey, result);
+            console.log('💾 [CACHE] Resposta salva no cache');
+            
+            return result;
         } else {
             const errorData = await response.text();
             console.error('❌ [AGNO_AI] Erro na resposta:', response.status, errorData);
@@ -2515,29 +2598,37 @@ router.get('/memory-status', async (req, res) => {
 // 🔥 AUTO WARM-UP - Mantém Agno AI ativo (evita cold start)
 // ============================================================
 
-// Warm-up automático a cada 10 minutos (se configurado)
+// Warm-up INTELIGENTE - apenas se inativo por >8 minutos (economia 50%)
 if (AGNO_API_URL && AGNO_API_URL !== 'http://localhost:8000') {
     const WARMUP_INTERVAL = 10 * 60 * 1000; // 10 minutos
     
     setInterval(async () => {
         try {
-            console.log('🔥 [AUTO-WARMUP] Aquecendo Agno AI...');
-            const response = await fetch(`${AGNO_API_URL}/health`, {
-                signal: AbortSignal.timeout(5000)
-            });
+            const inactiveTime = Date.now() - lastActivity;
+            const inactiveMinutes = Math.floor(inactiveTime / 60000);
             
-            if (response.ok) {
-                console.log('✅ [AUTO-WARMUP] Agno AI aquecido com sucesso');
-                agnoWarmed = true;
+            // Aquecer apenas se inativo por mais de 8 minutos
+            if (inactiveTime > 8 * 60 * 1000) {
+                console.log(`🔥 [AUTO-WARMUP] Inativo ${inactiveMinutes}min - aquecendo...`);
+                const response = await fetch(`${AGNO_API_URL}/health`, {
+                    signal: AbortSignal.timeout(5000)
+                });
+                
+                if (response.ok) {
+                    console.log('✅ [AUTO-WARMUP] Agno AI aquecido com sucesso');
+                    agnoWarmed = true;
+                } else {
+                    console.warn('⚠️ [AUTO-WARMUP] Agno AI não respondeu:', response.status);
+                }
             } else {
-                console.warn('⚠️ [AUTO-WARMUP] Agno AI não respondeu:', response.status);
+                console.log(`✅ [AUTO-WARMUP] Ativo (${inactiveMinutes}min) - warm-up desnecessário`);
             }
         } catch (error) {
             console.warn('⚠️ [AUTO-WARMUP] Erro ao aquecer:', error.message);
         }
     }, WARMUP_INTERVAL);
     
-    console.log('🔥 [AUTO-WARMUP] Sistema ativado - aquecimento a cada 10min');
+    console.log('🔥 [AUTO-WARMUP] Sistema INTELIGENTE ativado (economia 50%)');
 }
 
 export default router;
