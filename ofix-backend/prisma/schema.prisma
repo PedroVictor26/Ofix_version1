@@ -1,7 +1,7 @@
 generator client {
   provider = "prisma-client-js"
   // Otimizações para ambientes em nuvem
-  binaryTargets = ["native", "rhel-openssl-1.0.x"]
+  binaryTargets = ["native", "rhel-openssl-1.0.x", "rhel-openssl-3.0.x"]
   previewFeatures = ["relationJoins"]
 }
 
