@@ -11,6 +11,7 @@ export default function ServiceMessages({
   cliente,
   veiculo,
   mensagens,
+  isGuest,
 }) {
   console.log("ServiceMessages - Props recebidas:", {
     service,
@@ -104,44 +105,46 @@ export default function ServiceMessages({
         </div>
 
         {/* Mensagem Personalizada */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <MessageCircle className="w-5 h-5" />
-              Mensagem Personalizada
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <Textarea
-              placeholder="Digite sua mensagem personalizada..."
-              value={customMessage}
-              onChange={(e) => setCustomMessage(e.target.value)}
-              className="h-24"
-            />
-            <div className="flex gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={sendCustomMessage}
-                disabled={!customMessage.trim()}
-                className="flex items-center gap-2"
-              >
-                <ExternalLink className="w-4 h-4" />
-                Enviar WhatsApp
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => copyToClipboard(customMessage)}
-                disabled={!customMessage.trim()}
-                className="flex items-center gap-2"
-              >
-                <Copy className="w-4 h-4" />
-                Copiar
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+        {!isGuest && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <MessageCircle className="w-5 h-5" />
+                Mensagem Personalizada
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <Textarea
+                placeholder="Digite sua mensagem personalizada..."
+                value={customMessage}
+                onChange={(e) => setCustomMessage(e.target.value)}
+                className="h-24"
+              />
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={sendCustomMessage}
+                  disabled={!customMessage.trim()}
+                  className="flex items-center gap-2"
+                >
+                  <ExternalLink className="w-4 h-4" />
+                  Enviar WhatsApp
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => copyToClipboard(customMessage)}
+                  disabled={!customMessage.trim()}
+                  className="flex items-center gap-2"
+                >
+                  <Copy className="w-4 h-4" />
+                  Copiar
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Templates de Mensagem */}
         <div className="grid gap-4">
@@ -169,22 +172,24 @@ export default function ServiceMessages({
                   <p className="text-sm text-slate-700 whitespace-pre-wrap">
                     {replaceVariables(
                       mensagem.textoMensagem ||
-                        mensagem.template ||
-                        "Texto não disponível"
+                      mensagem.template ||
+                      "Texto não disponível"
                     )}
                   </p>
                 </div>
 
                 <div className="flex gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => sendWhatsApp(mensagem)}
-                    className="flex items-center gap-2"
-                  >
-                    <ExternalLink className="w-4 h-4" />
-                    Enviar WhatsApp
-                  </Button>
+                  {!isGuest && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => sendWhatsApp(mensagem)}
+                      className="flex items-center gap-2"
+                    >
+                      <ExternalLink className="w-4 h-4" />
+                      Enviar WhatsApp
+                    </Button>
+                  )}
                   <Button
                     variant="outline"
                     size="sm"

@@ -9,6 +9,7 @@ export default function ServiceProcedures({
   service,
   procedimentos,
   onUpdate,
+  isGuest,
 }) {
   console.log("ServiceProcedures - Props recebidas:", {
     service,
@@ -109,16 +110,18 @@ export default function ServiceProcedures({
                     )}
                   </div>
                 </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handleApplyProcedure(procedimento)}
-                  disabled={isApplying}
-                  className="flex items-center gap-2"
-                >
-                  <Plus className="w-4 h-4" />
-                  Aplicar
-                </Button>
+                {!isGuest && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleApplyProcedure(procedimento)}
+                    disabled={isApplying}
+                    className="flex items-center gap-2"
+                  >
+                    <Plus className="w-4 h-4" />
+                    Aplicar
+                  </Button>
+                )}
               </div>
             </CardHeader>
             <CardContent>

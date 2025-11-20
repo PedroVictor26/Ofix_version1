@@ -36,6 +36,10 @@ export const getTransacaoById = async (req, res) => {
 };
 
 export const createTransacao = async (req, res) => {
+  if (req.user?.isGuest) {
+    return res.status(403).json({ error: 'Acesso negado. Convidados não podem criar transações.' });
+  }
+
   const { descricao, valor, tipo, categoria, data, servicoId } = req.body;
   const oficinaId = req.user?.oficinaId;
 
@@ -63,6 +67,10 @@ export const createTransacao = async (req, res) => {
 };
 
 export const updateTransacao = async (req, res) => {
+  if (req.user?.isGuest) {
+    return res.status(403).json({ error: 'Acesso negado. Convidados não podem editar transações.' });
+  }
+
   const { id } = req.params;
   const { descricao, valor, tipo, categoria, data, servicoId } = req.body;
   const oficinaId = req.user?.oficinaId;
@@ -91,6 +99,10 @@ export const updateTransacao = async (req, res) => {
 };
 
 export const deleteTransacao = async (req, res) => {
+  if (req.user?.isGuest) {
+    return res.status(403).json({ error: 'Acesso negado. Convidados não podem excluir transações.' });
+  }
+
   const { id } = req.params;
   try {
     await prisma.financeiro.delete({

@@ -34,11 +34,12 @@ export function protectRoute(req, res, next) {
     // Anexa o payload decodificado do token ao objeto req.user
     // Isso normalmente inclui o ID do usuário, ID da oficina, papel, etc.
     req.user = {
-        id: decoded.userId, // Renomeado de userId para id para consistência com o modelo User
-        email: decoded.email,
-        role: decoded.role,
-        oficinaId: decoded.oficinaId,
-        // ... outros campos do payload que você queira expor
+      id: decoded.userId, // Renomeado de userId para id para consistência com o modelo User
+      email: decoded.email,
+      role: decoded.role,
+      oficinaId: decoded.oficinaId,
+      isGuest: decoded.email && decoded.email.endsWith('@ofix.temp'),
+      // ... outros campos do payload que você queira expor
     };
     // Log apenas em desenvolvimento para evitar vazamento de informações em produção
     if (process.env.NODE_ENV === 'development') {
@@ -55,6 +56,6 @@ export function protectRoute(req, res, next) {
     }
     // Para outros erros inesperados durante a verificação do token
     console.error("Erro ao verificar token:", error);
-    return res.status(500).json({ error: 'Erro interno ao validar o token de autenticação.'});
+    return res.status(500).json({ error: 'Erro interno ao validar o token de autenticação.' });
   }
 }

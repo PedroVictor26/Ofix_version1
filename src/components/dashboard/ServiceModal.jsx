@@ -26,6 +26,7 @@ export default function ServiceModal({
   onUpdate,
   clientes,
   veiculos,
+  isGuest,
 }) {
   const [activeTab, setActiveTab] = useState("details");
   const [procedimentos, setProcedimentos] = useState([]);
@@ -162,6 +163,7 @@ export default function ServiceModal({
               cliente={cliente}
               veiculo={veiculo}
               onUpdate={handleServiceUpdate}
+              isGuest={isGuest}
             />
           </TabsContent>
 
@@ -170,6 +172,7 @@ export default function ServiceModal({
               service={service}
               procedimentos={procedimentos}
               onUpdate={handleServiceUpdate}
+              isGuest={isGuest}
             />
           </TabsContent>
 
@@ -178,6 +181,7 @@ export default function ServiceModal({
               service={service}
               pecas={pecas}
               onUpdate={handleServiceUpdate}
+              isGuest={isGuest}
             />
           </TabsContent>
 
@@ -187,6 +191,7 @@ export default function ServiceModal({
               cliente={cliente}
               veiculo={veiculo}
               mensagens={mensagens}
+              isGuest={isGuest}
             />
           </TabsContent>
         </Tabs>

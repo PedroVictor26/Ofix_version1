@@ -8,7 +8,7 @@ import { createItemServicoPeca } from "../../services/itemServicoPeca.service";
 import { updatePeca } from "../../services/pecas.service";
 import toast from "react-hot-toast";
 
-export default function ServiceParts({ service, pecas, onUpdate }) {
+export default function ServiceParts({ service, pecas, onUpdate, isGuest }) {
   console.log("ServiceParts - Props recebidas:", { service, pecas });
   console.log("ServiceParts - Primeira peça (estrutura):", pecas?.[0]);
 
@@ -167,6 +167,7 @@ export default function ServiceParts({ service, pecas, onUpdate }) {
                       value={selectedQuantities[peca.id] || 1}
                       onChange={(e) => setQuantity(peca.id, e.target.value)}
                       className="w-20"
+                      disabled={isGuest}
                     />
                   </div>
                   <div className="text-sm text-slate-600">
@@ -176,16 +177,18 @@ export default function ServiceParts({ service, pecas, onUpdate }) {
                       Number(peca.precoVenda || 0)
                     ).toFixed(2)}
                   </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleAddPart(peca)}
-                    disabled={isAdding || peca.estoqueAtual === 0}
-                    className="ml-auto flex items-center gap-2"
-                  >
-                    <Plus className="w-4 h-4" />
-                    Adicionar
-                  </Button>
+                  {!isGuest && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleAddPart(peca)}
+                      disabled={isAdding || peca.estoqueAtual === 0}
+                      className="ml-auto flex items-center gap-2"
+                    >
+                      <Plus className="w-4 h-4" />
+                      Adicionar
+                    </Button>
+                  )}
                 </div>
               </CardContent>
             </Card>

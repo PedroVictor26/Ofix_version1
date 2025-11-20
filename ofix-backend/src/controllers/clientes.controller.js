@@ -3,6 +3,10 @@ import prisma from "../config/database.js";
 class ClientesController {
   async createCliente(req, res, next) {
     try {
+      if (req.user?.isGuest) {
+        return res.status(403).json({ error: 'Acesso negado. Convidados não podem criar clientes.' });
+      }
+
       const { nomeCompleto, cpfCnpj, telefone, email, endereco } = req.body;
       const oficinaId = req.user?.oficinaId;
 
@@ -52,6 +56,18 @@ class ClientesController {
         include: { veiculos: true }, // Inclui os veículos relacionados
         orderBy: { nomeCompleto: "asc" },
       });
+
+      if (req.user?.isGuest) {
+        const maskedClientes = clientes.map(cliente => ({
+          ...cliente,
+          cpfCnpj: cliente.cpfCnpj ? '***.***.***-**' : null,
+          telefone: cliente.telefone ? '(**) *****-****' : null,
+          email: cliente.email ? '***@***.***' : null,
+          endereco: cliente.endereco ? 'Endereço Oculto' : null,
+        }));
+        return res.json(maskedClientes);
+      }
+
       res.json(clientes);
     } catch (error) {
       next(error);
@@ -74,6 +90,17 @@ class ClientesController {
       if (!cliente) {
         return res.status(404).json({ error: "Cliente não encontrado." });
       }
+
+      if (req.user?.isGuest) {
+        return res.json({
+          ...cliente,
+          cpfCnpj: cliente.cpfCnpj ? '***.***.***-**' : null,
+          telefone: cliente.telefone ? '(**) *****-****' : null,
+          email: cliente.email ? '***@***.***' : null,
+          endereco: cliente.endereco ? 'Endereço Oculto' : null,
+        });
+      }
+
       res.json(cliente);
     } catch (error) {
       next(error);
@@ -82,6 +109,10 @@ class ClientesController {
 
   async updateCliente(req, res, next) {
     try {
+      if (req.user?.isGuest) {
+        return res.status(403).json({ error: 'Acesso negado. Convidados não podem editar clientes.' });
+      }
+
       const { id } = req.params;
       const oficinaId = req.user?.oficinaId;
 
@@ -127,6 +158,10 @@ class ClientesController {
 
   async deleteCliente(req, res, next) {
     try {
+      if (req.user?.isGuest) {
+        return res.status(403).json({ error: 'Acesso negado. Convidados não podem excluir clientes.' });
+      }
+
       const { id } = req.params;
       const oficinaId = req.user?.oficinaId;
 
@@ -179,6 +214,10 @@ class ClientesController {
 
   async createVeiculo(req, res, next) {
     try {
+      if (req.user?.isGuest) {
+        return res.status(403).json({ error: 'Acesso negado. Convidados não podem criar veículos.' });
+      }
+
       const { clienteId } = req.params;
       const {
         placa,

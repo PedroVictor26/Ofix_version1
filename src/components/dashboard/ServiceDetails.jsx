@@ -20,6 +20,7 @@ export default function ServiceDetails({
   cliente,
   veiculo,
   onUpdate,
+  isGuest,
 }) {
   console.log("ServiceDetails - Props recebidas:", {
     service,
@@ -139,6 +140,7 @@ export default function ServiceDetails({
                   onValueChange={(value) =>
                     setFormData({ ...formData, status: value })
                   }
+                  disabled={isGuest}
                 >
                   <SelectTrigger>
                     <SelectValue />
@@ -170,6 +172,7 @@ export default function ServiceDetails({
                       dataPrevisaoEntrega: e.target.value,
                     })
                   }
+                  disabled={isGuest}
                 />
               </div>
             </div>
@@ -187,6 +190,7 @@ export default function ServiceDetails({
                 }
                 placeholder="Descreva o problema relatado pelo cliente..."
                 className="h-24"
+                disabled={isGuest}
               />
             </div>
 
@@ -200,6 +204,7 @@ export default function ServiceDetails({
                 }
                 placeholder="Diagnóstico técnico detalhado..."
                 className="h-24"
+                disabled={isGuest}
               />
             </div>
 
@@ -217,6 +222,7 @@ export default function ServiceDetails({
                   })
                 }
                 placeholder="0,00"
+                disabled={isGuest}
               />
             </div>
           </CardContent>
@@ -226,9 +232,11 @@ export default function ServiceDetails({
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle>Checklist do Serviço</CardTitle>
-            <Button variant="outline" size="sm" onClick={addChecklistItem}>
-              Adicionar Item
-            </Button>
+            {!isGuest && (
+              <Button variant="outline" size="sm" onClick={addChecklistItem}>
+                Adicionar Item
+              </Button>
+            )}
           </CardHeader>
           <CardContent>
             {formData.checklist.length === 0 ? (
@@ -247,6 +255,7 @@ export default function ServiceDetails({
                       onCheckedChange={(checked) =>
                         updateChecklistItem(index, "concluido", checked)
                       }
+                      disabled={isGuest}
                     />
                     <div className="flex-1 space-y-2">
                       <Input
@@ -255,6 +264,7 @@ export default function ServiceDetails({
                           updateChecklistItem(index, "item", e.target.value)
                         }
                         placeholder="Descrição da tarefa..."
+                        disabled={isGuest}
                       />
                       <Input
                         value={item.observacao || ""}
@@ -267,6 +277,7 @@ export default function ServiceDetails({
                         }
                         placeholder="Observações..."
                         className="text-sm"
+                        disabled={isGuest}
                       />
                     </div>
                   </div>
@@ -277,16 +288,18 @@ export default function ServiceDetails({
         </Card>
 
         {/* Botão Salvar */}
-        <div className="flex justify-end">
-          <Button
-            onClick={handleSave}
-            disabled={isUpdating}
-            className="bg-green-600 hover:bg-green-700"
-          >
-            <Save className="w-4 h-4 mr-2" />
-            {isUpdating ? "Salvando..." : "Salvar Alterações"}
-          </Button>
-        </div>
+        {!isGuest && (
+          <div className="flex justify-end">
+            <Button
+              onClick={handleSave}
+              disabled={isUpdating}
+              className="bg-green-600 hover:bg-green-700"
+            >
+              <Save className="w-4 h-4 mr-2" />
+              {isUpdating ? "Salvando..." : "Salvar Alterações"}
+            </Button>
+          </div>
+        )}
       </div>
     );
   } catch (error) {

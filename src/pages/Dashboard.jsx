@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from "react";
-import { Plus, BarChart3, AlertCircle, RefreshCw, Search, X } from "lucide-react";
+import { Plus, BarChart3, AlertCircle, RefreshCw, Search, X, Share2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DndContext,
@@ -25,7 +25,7 @@ import NewServiceModal from "@/components/dashboard/NewServiceModal";
 import * as servicosService from "../services/servicos.service.js";
 import * as authService from "../services/auth.service.js";
 import { toast } from "react-hot-toast";
-import { Share2 } from "lucide-react";
+import { useAuth } from "@/context/AuthContext";
 
 // Componente de Erro Refinado
 const ErrorState = ({ error, onRetry }) => (
@@ -47,6 +47,7 @@ const ErrorState = ({ error, onRetry }) => (
 );
 
 export default function Dashboard() {
+  const { user } = useAuth();
   const isMobile = useIsMobile();
   const { servicos, clientes, veiculos, isLoading, error, reload } =
     useDashboardData();
@@ -138,6 +139,11 @@ export default function Dashboard() {
     console.log("Drag End Event - active:", active); // Log para depuração
     console.log("Drag End Event - over:", over); // Log para depuração
 
+    if (user?.isGuest) {
+      toast.error("Modo visualização: você não pode alterar o status.");
+      return;
+    }
+
     if (!over || over.data.current?.type !== "column") {
       console.error(
         "Solto fora de uma coluna válida ou tipo de destino incorreto:",
@@ -226,31 +232,35 @@ export default function Dashboard() {
                     }
                   </p>
                 </div>
-                <Button
-                  onClick={() => setNewServiceModalOpen(true)}
-                  size="lg"
-                  className="bg-blue-600 hover:bg-blue-700 min-h-[48px] touch-manipulation"
-                >
-                  <Plus className="w-5 h-5 mr-2" />
-                  Nova Ordem de Serviço
-                </Button>
-                <Button
-                  onClick={async () => {
-                    try {
-                      const link = await authService.getInviteLink();
-                      await navigator.clipboard.writeText(link);
-                      toast.success("Link de convite copiado para a área de transferência!");
-                    } catch (error) {
-                      toast.error("Erro ao gerar convite: " + error.message);
-                    }
-                  }}
-                  variant="outline"
-                  size="lg"
-                  className="min-h-[48px] touch-manipulation border-blue-200 text-blue-700 hover:bg-blue-50"
-                >
-                  <Share2 className="w-5 h-5 mr-2" />
-                  Convidar
-                </Button>
+                {!user?.isGuest && (
+                  <>
+                    <Button
+                      onClick={() => setNewServiceModalOpen(true)}
+                      size="lg"
+                      className="bg-blue-600 hover:bg-blue-700 min-h-[48px] touch-manipulation"
+                    >
+                      <Plus className="w-5 h-5 mr-2" />
+                      Nova Ordem de Serviço
+                    </Button>
+                    <Button
+                      onClick={async () => {
+                        try {
+                          const link = await authService.getInviteLink();
+                          await navigator.clipboard.writeText(link);
+                          toast.success("Link de convite copiado para a área de transferência!");
+                        } catch (error) {
+                          toast.error("Erro ao gerar convite: " + error.message);
+                        }
+                      }}
+                      variant="outline"
+                      size="lg"
+                      className="min-h-[48px] touch-manipulation border-blue-200 text-blue-700 hover:bg-blue-50"
+                    >
+                      <Share2 className="w-5 h-5 mr-2" />
+                      Convidar
+                    </Button>
+                  </>
+                )}
               </div>
               <div className="flex items-center gap-4">
                 <div className="relative flex-1">
@@ -370,6 +380,7 @@ export default function Dashboard() {
         onUpdate={reload}
         clientes={clientes}
         veiculos={veiculos}
+        isGuest={user?.isGuest}
       />
     </DndContext>
   );

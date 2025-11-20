@@ -4,6 +4,10 @@ import { ServiceStatus } from '@prisma/client'; // Importar o enum ServiceStatus
 class ServicosController {
   async createServico(req, res, next) {
     try {
+      if (req.user?.isGuest) {
+        return res.status(403).json({ error: 'Acesso negado. Convidados não podem criar serviços.' });
+      }
+
       const {
         numeroOs, status, descricaoProblema, descricaoSolucao, dataEntrada,
         dataPrevisaoEntrega, dataConclusao, dataEntregaCliente, valorTotalEstimado,
@@ -11,7 +15,7 @@ class ServicosController {
         observacoes, clienteId, veiculoId, responsavelId
       } = req.body;
 
-      const oficinaId = req.user?.oficinaId; 
+      const oficinaId = req.user?.oficinaId;
 
       if (!oficinaId) {
         return res.status(401).json({ error: 'Oficina não identificada. Acesso não autorizado.' });
@@ -31,9 +35,9 @@ class ServicosController {
         return res.status(404).json({ error: 'Veículo não encontrado ou não pertence ao cliente informado.' });
       }
       if (responsavelId) {
-        const responsavelExists = await prisma.user.findUnique({ where: { id: responsavelId, oficinaId }});
+        const responsavelExists = await prisma.user.findUnique({ where: { id: responsavelId, oficinaId } });
         if (!responsavelExists) {
-            return res.status(404).json({ error: 'Usuário responsável não encontrado nesta oficina.' });
+          return res.status(404).json({ error: 'Usuário responsável não encontrado nesta oficina.' });
         }
       }
 
@@ -61,20 +65,20 @@ class ServicosController {
           oficina: { connect: { id: oficinaId } },
         },
         select: { // Usar select para incluir apenas os campos necessários
-            id: true,
-            numeroOs: true,
-            status: true,
-            descricaoProblema: true,
-            dataEntrada: true,
-            kmEntrada: true,
-            valorTotalEstimado: true,
-            clienteId: true, // Incluir clienteId diretamente
-            veiculoId: true, // Incluir veiculoId diretamente
-            responsavelId: true,
-            oficinaId: true,
-            cliente: { select: { id: true, nomeCompleto: true } },
-            veiculo: { select: { id: true, placa: true, modelo: true } },
-            responsavel: { select: { id: true, nome: true } },
+          id: true,
+          numeroOs: true,
+          status: true,
+          descricaoProblema: true,
+          dataEntrada: true,
+          kmEntrada: true,
+          valorTotalEstimado: true,
+          clienteId: true, // Incluir clienteId diretamente
+          veiculoId: true, // Incluir veiculoId diretamente
+          responsavelId: true,
+          oficinaId: true,
+          cliente: { select: { id: true, nomeCompleto: true } },
+          veiculo: { select: { id: true, placa: true, modelo: true } },
+          responsavel: { select: { id: true, nome: true } },
         }
       });
       res.status(201).json(novoServico);
@@ -109,14 +113,29 @@ class ServicosController {
       const servicos = await prisma.servico.findMany({
         where: whereConditions,
         include: { // Inclui todos os dados do veículo e cliente relacionados
-            cliente: true,
-            veiculo: true,
-            responsavel: { select: { id: true, nome: true } },
+          cliente: true,
+          veiculo: true,
+          responsavel: { select: { id: true, nome: true } },
         },
         orderBy: {
-            dataEntrada: 'desc' // Exemplo de ordenação
+          dataEntrada: 'desc' // Exemplo de ordenação
         }
       });
+
+      if (req.user?.isGuest) {
+        const maskedServicos = servicos.map(servico => ({
+          ...servico,
+          cliente: servico.cliente ? {
+            ...servico.cliente,
+            cpfCnpj: servico.cliente.cpfCnpj ? '***.***.***-**' : null,
+            telefone: servico.cliente.telefone ? '(**) *****-****' : null,
+            email: servico.cliente.email ? '***@***.***' : null,
+            endereco: servico.cliente.endereco ? 'Endereço Oculto' : null,
+          } : null
+        }));
+        return res.json(maskedServicos);
+      }
+
       res.json(servicos);
     } catch (error) {
       next(error);
@@ -126,7 +145,7 @@ class ServicosController {
   async getServicoById(req, res, next) {
     try {
       const { id } = req.params;
- // Descomentar
+      // Descomentar
       const oficinaId = req.user?.oficinaId;
       if (!oficinaId) {
         return res.status(401).json({ error: 'Oficina não identificada.' });
@@ -146,6 +165,17 @@ class ServicosController {
       if (!servico) {
         return res.status(404).json({ error: 'Serviço não encontrado.' });
       }
+
+      if (req.user?.isGuest && servico.cliente) {
+        servico.cliente = {
+          ...servico.cliente,
+          cpfCnpj: servico.cliente.cpfCnpj ? '***.***.***-**' : null,
+          telefone: servico.cliente.telefone ? '(**) *****-****' : null,
+          email: servico.cliente.email ? '***@***.***' : null,
+          endereco: servico.cliente.endereco ? 'Endereço Oculto' : null,
+        };
+      }
+
       res.json(servico);
     } catch (error) {
       next(error);
@@ -154,8 +184,12 @@ class ServicosController {
 
   async updateServico(req, res, next) {
     try {
+      if (req.user?.isGuest) {
+        return res.status(403).json({ error: 'Acesso negado. Convidados não podem editar serviços.' });
+      }
+
       const { id } = req.params;
- // Descomentar
+      // Descomentar
       const oficinaId = req.user?.oficinaId;
       if (!oficinaId) {
         return res.status(401).json({ error: 'Oficina não identificada.' });
@@ -178,12 +212,12 @@ class ServicosController {
         updateData.clienteId = clienteId;
       }
       if (veiculoId && veiculoId !== servicoExistente.veiculoId) {
-        const veiculoExists = await prisma.veiculo.findUnique({ where: { id: veiculoId, ...(clienteId ? {clienteId} : {clienteId: servicoExistente.clienteId}) } });
+        const veiculoExists = await prisma.veiculo.findUnique({ where: { id: veiculoId, ...(clienteId ? { clienteId } : { clienteId: servicoExistente.clienteId }) } });
         if (!veiculoExists) return res.status(404).json({ error: 'Novo veículo não encontrado ou não pertence ao cliente.' });
         updateData.veiculoId = veiculoId;
       }
-       if (responsavelId && responsavelId !== servicoExistente.responsavelId) {
-        const responsavelExists = await prisma.user.findUnique({ where: { id: responsavelId, oficinaId }});
+      if (responsavelId && responsavelId !== servicoExistente.responsavelId) {
+        const responsavelExists = await prisma.user.findUnique({ where: { id: responsavelId, oficinaId } });
         if (!responsavelExists) return res.status(404).json({ error: 'Novo responsável não encontrado.' });
         updateData.responsavelId = responsavelId;
       } else if (responsavelId === null) { // Permitir desassociar responsável
@@ -210,9 +244,9 @@ class ServicosController {
         where: { id, oficinaId }, // Dupla checagem de segurança
         data: updateData,
         include: {
-            cliente: { select: { id: true, nomeCompleto: true } },
-            veiculo: { select: { id: true, placa: true, modelo: true } },
-            responsavel: { select: { id: true, nome: true } },
+          cliente: { select: { id: true, nomeCompleto: true } },
+          veiculo: { select: { id: true, placa: true, modelo: true } },
+          responsavel: { select: { id: true, nome: true } },
         }
       });
       res.json(servicoAtualizado);
@@ -229,8 +263,12 @@ class ServicosController {
 
   async deleteServico(req, res, next) {
     try {
+      if (req.user?.isGuest) {
+        return res.status(403).json({ error: 'Acesso negado. Convidados não podem excluir serviços.' });
+      }
+
       const { id } = req.params;
- // Descomentar
+      // Descomentar
       const oficinaId = req.user?.oficinaId;
       if (!oficinaId) {
         return res.status(401).json({ error: 'Oficina não identificada.' });
@@ -259,7 +297,7 @@ class ServicosController {
       // Tratar erro P2003 (foreign key constraint) se houver dados relacionados que impedem a exclusão
       // e não estiverem configurados para cascade delete.
       if (error.code === 'P2003') {
-         return res.status(409).json({ error: 'Não é possível excluir o serviço pois existem dados relacionados (ex: itens de serviço, procedimentos). Remova-os primeiro ou contate o suporte.' });
+        return res.status(409).json({ error: 'Não é possível excluir o serviço pois existem dados relacionados (ex: itens de serviço, procedimentos). Remova-os primeiro ou contate o suporte.' });
       }
       next(error);
     }
@@ -269,9 +307,9 @@ class ServicosController {
   async getServicosAtivos(req, res, next) {
     try {
       const { oficinaId } = req.user;
-      
+
       const count = await prisma.servico.count({
-        where: { 
+        where: {
           oficinaId,
           status: {
             not: 'FINALIZADO' // Conta todos exceto finalizados

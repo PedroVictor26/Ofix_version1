@@ -26,7 +26,8 @@ export const AuthProvider = ({ children }) => {
     try {
       const storedData = authService.getCurrentUser(); // { user, token } ou null
       if (storedData && storedData.token && storedData.user) {
-        setUser(storedData.user);
+        const isGuest = storedData.user.email?.endsWith('@ofix.temp');
+        setUser({ ...storedData.user, isGuest });
         setToken(storedData.token);
         setIsAuthenticated(true);
       } else {
@@ -55,7 +56,8 @@ export const AuthProvider = ({ children }) => {
     setIsLoadingAuth(true);
     try {
       const data = await authService.login(credentials); // authService.login já salva no localStorage
-      setUser(data.user);
+      const isGuest = data.user.email?.endsWith('@ofix.temp');
+      setUser({ ...data.user, isGuest });
       setToken(data.token);
       setIsAuthenticated(true);
       navigate('/dashboard'); // Redireciona para o dashboard após login
