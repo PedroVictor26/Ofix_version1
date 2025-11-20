@@ -9,8 +9,9 @@ import LoadingSpinner from './components/ui/LoadingSpinner.jsx';
 import ErrorBoundary from './components/ErrorBoundary.jsx';
 
 import Layout from './Layout';
-import LoginPage from './pages/LoginPage.jsx'; // Manter carregamento direto para login
-import RegisterPage from './pages/RegisterPage.jsx'; // Manter carregamento direto para register
+import LoginPage from './pages/LoginPage.jsx';
+import RegisterPage from './pages/RegisterPage.jsx';
+import InvitePage from './pages/InvitePage.jsx';
 
 // Lazy loading das páginas principais
 const Dashboard = lazy(() => import('./pages/Dashboard.jsx'));
@@ -27,16 +28,17 @@ export default function App() {
         <AuthProvider>
           {/* O Toaster para notificações globais */}
           <Toaster position="top-right" />
-          
+
           <Routes>
             {/* Rotas Públicas */}
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
+            <Route path="/invite" element={<InvitePage />} />
 
             {/* Rota "Mãe" Protegida que renderiza o Layout */}
             {/* Todas as rotas dentro dela exigirão autenticação */}
-            <Route 
-              path="/" 
+            <Route
+              path="/"
               element={
                 <ProtectedRoute>
                   <Layout />
@@ -44,10 +46,10 @@ export default function App() {
               }
             >
               {/* Rotas "Filhas" - Serão renderizadas no <Outlet> do Layout */}
-              
+
               {/* Redireciona a rota raiz "/" para "/dashboard" */}
               <Route index element={<Navigate to="/dashboard" replace />} />
-              
+
               {/* Rotas com Lazy Loading e Suspense */}
               <Route path="dashboard" element={
                 <Suspense fallback={<LoadingSpinner />}>
@@ -84,8 +86,8 @@ export default function App() {
                 <Suspense fallback={<LoadingSpinner />}>
                   <Configuracoes />
                 </Suspense>
-              } /> 
-              
+              } />
+
               {/* Rota "Curinga" para caminhos não encontrados DENTRO do layout */}
               <Route path="*" element={<Navigate to="/dashboard" replace />} />
             </Route>

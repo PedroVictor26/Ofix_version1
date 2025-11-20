@@ -43,10 +43,10 @@ export async function registerUserAndOficina({ nomeUser, emailUser, passwordUser
         role: true,
         oficinaId: true,
         oficina: {
-            select: {
-                id: true,
-                nome: true
-            }
+          select: {
+            id: true,
+            nome: true
+          }
         }
       }
     });
@@ -58,7 +58,7 @@ export async function registerUserAndOficina({ nomeUser, emailUser, passwordUser
 export async function loginUser({ email, password }) {
   const user = await prisma.user.findUnique({
     where: { email },
-    include: { oficina: { select: { id: true, nome: true} } } // Inclui dados da oficina
+    include: { oficina: { select: { id: true, nome: true } } } // Inclui dados da oficina
   });
 
   if (!user) {
@@ -86,4 +86,74 @@ export async function loginUser({ email, password }) {
   // Retornar dados do usuário (sem a senha) e o token
   const { password: _, ...userWithoutPassword } = user;
   return { user: userWithoutPassword, token };
+}
+
+export async function createInviteToken(oficinaId) {
+  // Payload específico para o convite
+  const payload = {
+    oficinaId,
+    type: 'invite'
+  };
+
+  // Token com validade de 24 horas
+  const token = jwt.sign(payload, JWT_SECRET, {
+    expiresIn: '24h'
+  });
+
+  return token;
+}
+
+export async function processGuestLogin(inviteToken) {
+  try {
+    // 1. Verificar e decodificar o token de convite
+    const decoded = jwt.verify(inviteToken, JWT_SECRET);
+
+    if (decoded.type !== 'invite' || !decoded.oficinaId) {
+      throw new Error('Token de convite inválido.');
+    }
+
+    const oficinaId = decoded.oficinaId;
+
+    // 2. Criar um usuário convidado
+    // Gera um e-mail e senha aleatórios para o convidado
+    const randomSuffix = Math.random().toString(36).substring(2, 10);
+    const guestEmail = `convidado_${randomSuffix}@ofix.temp`;
+    const guestPassword = Math.random().toString(36).slice(-8); // Senha aleatória
+    const hashedPassword = await bcrypt.hash(guestPassword, 10);
+
+    const user = await prisma.user.create({
+      data: {
+        nome: `Convidado ${randomSuffix}`,
+        email: guestEmail,
+        password: hashedPassword,
+        role: 'USER', // Permissões limitadas
+        oficinaId: oficinaId,
+      },
+      include: {
+        oficina: { select: { id: true, nome: true } }
+      }
+    });
+
+    // 3. Gerar o token de sessão real para este usuário
+    const sessionTokenPayload = {
+      userId: user.id,
+      email: user.email,
+      role: user.role,
+      oficinaId: user.oficinaId,
+    };
+
+    const sessionToken = jwt.sign(sessionTokenPayload, JWT_SECRET, {
+      expiresIn: JWT_EXPIRES_IN || '1d',
+    });
+
+    const { password: _, ...userWithoutPassword } = user;
+    return { user: userWithoutPassword, token: sessionToken };
+
+  } catch (error) {
+    console.error("Erro ao processar login de convidado:", error);
+    if (error.name === 'TokenExpiredError') {
+      throw new Error('O link de convite expirou.');
+    }
+    throw new Error('Link de convite inválido ou erro ao criar sessão.');
+  }
 }

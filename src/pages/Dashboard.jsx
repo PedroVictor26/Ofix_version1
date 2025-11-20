@@ -23,6 +23,9 @@ import useDebounce from "@/hooks/useDebounce";
 import ServiceModal from "@/components/dashboard/ServiceModal";
 import NewServiceModal from "@/components/dashboard/NewServiceModal";
 import * as servicosService from "../services/servicos.service.js";
+import * as authService from "../services/auth.service.js";
+import { toast } from "react-hot-toast";
+import { Share2 } from "lucide-react";
 
 // Componente de Erro Refinado
 const ErrorState = ({ error, onRetry }) => (
@@ -66,20 +69,20 @@ export default function Dashboard() {
     }
 
     const term = debouncedSearchTerm.toLowerCase().trim();
-    
+
     return localServicos.filter((servico) => {
       // Buscar por número da OS
       if (servico.numeroOs?.toLowerCase().includes(term)) return true;
-      
+
       // Buscar por descrição do problema
       if (servico.descricaoProblema?.toLowerCase().includes(term)) return true;
-      
+
       // Buscar por nome do cliente
       const cliente = clientes[servico.clienteId];
       if (cliente?.nomeCompleto?.toLowerCase().includes(term)) return true;
-      
+
       // Buscar por dados do veículo
-      const veiculo = veiculos.find(v => 
+      const veiculo = veiculos.find(v =>
         v.id === servico.veiculoId || v.id === servico.veiculo?.id
       );
       if (veiculo) {
@@ -87,7 +90,7 @@ export default function Dashboard() {
         if (veiculo.modelo?.toLowerCase().includes(term)) return true;
         if (veiculo.placa?.toLowerCase().includes(term)) return true;
       }
-      
+
       return false;
     });
   }, [localServicos, debouncedSearchTerm, clientes, veiculos]);
@@ -217,7 +220,7 @@ export default function Dashboard() {
                 <div className="flex-1">
                   <h2 className="text-lg font-semibold text-slate-800 mb-1">Buscar Serviços</h2>
                   <p className="text-sm text-slate-500">
-                    {searchTerm 
+                    {searchTerm
                       ? `Mostrando ${stats.total} de ${stats.totalGeral} serviços`
                       : "Visualize e gerencie os serviços da sua oficina."
                     }
@@ -230,6 +233,23 @@ export default function Dashboard() {
                 >
                   <Plus className="w-5 h-5 mr-2" />
                   Nova Ordem de Serviço
+                </Button>
+                <Button
+                  onClick={async () => {
+                    try {
+                      const link = await authService.getInviteLink();
+                      await navigator.clipboard.writeText(link);
+                      toast.success("Link de convite copiado para a área de transferência!");
+                    } catch (error) {
+                      toast.error("Erro ao gerar convite: " + error.message);
+                    }
+                  }}
+                  variant="outline"
+                  size="lg"
+                  className="min-h-[48px] touch-manipulation border-blue-200 text-blue-700 hover:bg-blue-50"
+                >
+                  <Share2 className="w-5 h-5 mr-2" />
+                  Convidar
                 </Button>
               </div>
               <div className="flex items-center gap-4">
@@ -260,7 +280,7 @@ export default function Dashboard() {
                   </div>
                 )}
               </div>
-              
+
               {searchTerm && stats.total === 0 && (
                 <div className="mt-4 p-4 bg-slate-50 rounded-lg border border-slate-200">
                   <div className="flex items-center gap-3">
@@ -285,7 +305,7 @@ export default function Dashboard() {
               Array(4)
                 .fill(0)
                 .map((_, i) => <StatsCardSkeleton key={i} />)
-            ) : ( 
+            ) : (
               <>
                 <StatsCards title="Total" value={stats.total} icon={BarChart3} />
                 {Object.entries(statusConfig).map(([status, cfg]) => (

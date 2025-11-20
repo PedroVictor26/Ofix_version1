@@ -13,7 +13,7 @@ class AuthController {
         });
       }
       if (passwordUser.length < 6) {
-          return res.status(400).json({ error: 'A senha deve ter pelo menos 6 caracteres.' });
+        return res.status(400).json({ error: 'A senha deve ter pelo menos 6 caracteres.' });
       }
 
       const newUser = await authService.registerUserAndOficina({
@@ -24,7 +24,7 @@ class AuthController {
       res.status(201).json({
         message: "Usuário e oficina registrados com sucesso! Por favor, faça login.",
         user: newUser // Retorna o usuário criado (sem senha)
-    });
+      });
 
     } catch (error) {
       if (error.code === 'P2002' && error.meta?.target?.includes('email')) {
@@ -65,7 +65,7 @@ class AuthController {
     try {
       // req.user é populado pelo middleware protectRoute
       if (!req.user || !req.user.userId) {
-        return res.status(401).json({ error: "Não autorizado ou token inválido."});
+        return res.status(401).json({ error: "Não autorizado ou token inválido." });
       }
       // Buscar dados mais completos do usuário se necessário, ou apenas retornar o que está no token
       // const userProfile = await prisma.user.findUnique({ where: { id: req.user.userId }, select: { id:true, nome:true, email:true, role:true, oficinaId:true }});
@@ -76,7 +76,46 @@ class AuthController {
     } catch (error) {
       next(error);
     }
+  });
+} catch (error) {
+  next(error);
+}
   }
+
+  async generateInviteLink(req, res, next) {
+  try {
+    const { oficinaId } = req.user; // Obtido do token do usuário logado
+
+    if (!oficinaId) {
+      return res.status(400).json({ error: "Usuário não está vinculado a uma oficina." });
+    }
+
+    const token = await authService.createInviteToken(oficinaId);
+
+    // Retorna o token. O frontend montará a URL completa.
+    res.json({ token });
+
+  } catch (error) {
+    next(error);
+  }
+}
+
+  async guestLogin(req, res, next) {
+  try {
+    const { token } = req.body;
+
+    if (!token) {
+      return res.status(400).json({ error: "Token de convite é obrigatório." });
+    }
+
+    const result = await authService.processGuestLogin(token);
+
+    res.json(result); // { user, token }
+
+  } catch (error) {
+    res.status(401).json({ error: error.message });
+  }
+}
 }
 
 export default new AuthController();

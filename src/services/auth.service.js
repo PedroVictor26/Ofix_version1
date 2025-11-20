@@ -68,11 +68,38 @@ export const isAuthenticated = () => {
 
 // Função para buscar o perfil do usuário (exemplo de chamada protegida)
 export const getProfile = async () => {
-    try {
-        const response = await apiClient.get('/auth/profile');
-        return response.data;
-    } catch (error) {
-        console.error("Erro ao buscar perfil:", error.response?.data?.error || error.message);
-        throw error.response?.data || { message: error.message || "Erro ao buscar perfil." };
+  try {
+    const response = await apiClient.get('/auth/profile');
+    return response.data;
+  } catch (error) {
+    console.error("Erro ao buscar perfil:", error.response?.data?.error || error.message);
+    throw error.response?.data || { message: error.message || "Erro ao buscar perfil." };
+  }
+};
+
+export const getInviteLink = async () => {
+  try {
+    const response = await apiClient.post('/auth/invite-link');
+    const inviteUrl = `${window.location.origin}/invite?token=${response.data.token}`;
+    return inviteUrl;
+  } catch (error) {
+    console.error("Erro ao gerar link de convite:", error.response?.data?.error || error.message);
+    throw error.response?.data || { message: error.message || "Erro ao gerar convite." };
+  }
+};
+
+export const loginWithInvite = async (token) => {
+  try {
+    const response = await apiClient.post('/auth/guest-login', { token });
+    if (response.data && response.data.token && response.data.user) {
+      localStorage.setItem(AUTH_TOKEN_KEY, JSON.stringify({
+        token: response.data.token,
+        user: response.data.user
+      }));
     }
+    return response.data;
+  } catch (error) {
+    console.error("Erro no login de convidado:", error.response?.data?.error || error.message);
+    throw error.response?.data || { message: error.message || "Erro ao entrar com convite." };
+  }
 };

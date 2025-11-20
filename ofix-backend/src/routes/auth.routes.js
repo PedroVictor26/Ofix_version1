@@ -13,5 +13,9 @@ router.post('/login', authController.login);
 // O middleware protectRoute será aplicado aqui
 router.get('/profile', protectRoute, authController.getProfile);
 
+// Rotas para acesso de convidado
+router.post('/invite-link', protectRoute, authController.generateInviteLink);
+router.post('/guest-login', authController.guestLogin);
+
 
 export default router;
