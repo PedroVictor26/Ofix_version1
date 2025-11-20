@@ -76,46 +76,42 @@ class AuthController {
     } catch (error) {
       next(error);
     }
-  });
-} catch (error) {
-  next(error);
-}
   }
 
   async generateInviteLink(req, res, next) {
-  try {
-    const { oficinaId } = req.user; // Obtido do token do usuário logado
+    try {
+      const { oficinaId } = req.user; // Obtido do token do usuário logado
 
-    if (!oficinaId) {
-      return res.status(400).json({ error: "Usuário não está vinculado a uma oficina." });
+      if (!oficinaId) {
+        return res.status(400).json({ error: "Usuário não está vinculado a uma oficina." });
+      }
+
+      const token = await authService.createInviteToken(oficinaId);
+
+      // Retorna o token. O frontend montará a URL completa.
+      res.json({ token });
+
+    } catch (error) {
+      next(error);
     }
-
-    const token = await authService.createInviteToken(oficinaId);
-
-    // Retorna o token. O frontend montará a URL completa.
-    res.json({ token });
-
-  } catch (error) {
-    next(error);
   }
-}
 
   async guestLogin(req, res, next) {
-  try {
-    const { token } = req.body;
+    try {
+      const { token } = req.body;
 
-    if (!token) {
-      return res.status(400).json({ error: "Token de convite é obrigatório." });
+      if (!token) {
+        return res.status(400).json({ error: "Token de convite é obrigatório." });
+      }
+
+      const result = await authService.processGuestLogin(token);
+
+      res.json(result); // { user, token }
+
+    } catch (error) {
+      res.status(401).json({ error: error.message });
     }
-
-    const result = await authService.processGuestLogin(token);
-
-    res.json(result); // { user, token }
-
-  } catch (error) {
-    res.status(401).json({ error: error.message });
   }
-}
 }
 
 export default new AuthController();
