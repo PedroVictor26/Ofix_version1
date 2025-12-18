@@ -50,10 +50,10 @@ export default function Estoque() {
         <header className="mb-2">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
             <div>
-              <h1 className="text-3xl font-bold text-slate-800">
+              <h1 className="text-3xl font-bold text-slate-800 dark:text-slate-100">
                 Controle de Estoque
               </h1>
-              <p className="text-slate-500 mt-1">
+              <p className="text-slate-500 dark:text-slate-400 mt-1">
                 Gerencie suas peças e fornecedores.
               </p>
             </div>
@@ -83,9 +83,9 @@ export default function Estoque() {
         </section>
 
         {/* Tabela e Filtros */}
-        <main className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+        <main className="bg-white dark:bg-slate-900 p-6 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-semibold text-slate-800">
+            <h2 className="text-xl font-semibold text-slate-800 dark:text-slate-100">
               Peças em Estoque
             </h2>
             <div className="relative w-full max-w-xs">
@@ -94,7 +94,7 @@ export default function Estoque() {
                 placeholder="Buscar por nome ou SKU..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
+                className="pl-10 bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500"
               />
             </div>
           </div>

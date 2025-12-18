@@ -22,10 +22,10 @@ const ErrorState = ({ error, onRetry }) => (
   <div className="flex items-center justify-center min-h-[60vh]">
     <div className="text-center p-8">
       <AlertCircle className="w-12 h-12 text-red-400 mx-auto mb-4" />
-      <h2 className="text-xl font-semibold text-slate-700 mb-2">
+      <h2 className="text-xl font-semibold text-slate-700 dark:text-slate-200 mb-2">
         Oops! Algo deu errado.
       </h2>
-      <p className="text-slate-500 mb-6">
+      <p className="text-slate-500 dark:text-slate-400 mb-6">
         Não foi possível carregar os dados. Tente novamente.
       </p>
       <StandardButton onClick={onRetry} variant="danger" icon={RefreshCw}>
@@ -37,12 +37,12 @@ const ErrorState = ({ error, onRetry }) => (
 
 // Componente de Estado Vazio com design refinado
 const EmptyState = ({ onNewCliente, searchTerm }) => (
-  <div className="text-center py-16 px-6 bg-white rounded-xl border border-slate-200">
+  <div className="text-center py-16 px-6 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800">
     <User className="w-12 h-12 mx-auto mb-4 text-slate-400" />
-    <h3 className="text-xl font-semibold text-slate-700 mb-2">
+    <h3 className="text-xl font-semibold text-slate-700 dark:text-slate-200 mb-2">
       Nenhum cliente encontrado
     </h3>
-    <p className="text-slate-500 mb-6">
+    <p className="text-slate-500 dark:text-slate-400 mb-6">
       {searchTerm
         ? "Tente ajustar sua busca."
         : "Clique no botão abaixo para começar."}
@@ -161,15 +161,15 @@ export default function Clientes() {
       <div className="w-full">
         {/* Breadcrumbs */}
         <Breadcrumbs />
-        
+
         {/* Header */}
         <header className="mb-2">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
             <div>
-              <h1 className="text-3xl font-bold text-slate-800">
+              <h1 className="text-3xl font-bold text-slate-800 dark:text-slate-100">
                 Gestão de Clientes
               </h1>
-              <p className="text-slate-500 mt-1">
+              <p className="text-slate-500 dark:text-slate-400 mt-1">
                 Visualize, adicione e gerencie seus clientes.
               </p>
             </div>
@@ -192,7 +192,7 @@ export default function Clientes() {
               placeholder="Buscar por nome, telefone ou email..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-11 pr-4 py-3 text-base h-12 rounded-lg border border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+              className="w-full pl-11 pr-4 py-3 text-base h-12 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:outline-none placeholder:text-slate-400 dark:placeholder:text-slate-500"
             />
           </div>
         </div>

@@ -123,10 +123,10 @@ export default function Configuracoes() {
         <header className="mb-2">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
             <div>
-              <h1 className="text-3xl font-bold text-slate-800">
+              <h1 className="text-3xl font-bold text-slate-800 dark:text-slate-100">
                 Base de Conhecimento
               </h1>
-              <p className="text-slate-500 mt-1">
+              <p className="text-slate-500 dark:text-slate-400 mt-1">
                 Gerencie procedimentos e templates de mensagem padrão.
               </p>
             </div>
@@ -134,7 +134,7 @@ export default function Configuracoes() {
         </header>
 
         {/* Tabs */}
-        <Card className="bg-white shadow-sm border-slate-200">
+        <Card className="bg-white dark:bg-slate-900 shadow-sm border-slate-200 dark:border-slate-800">
           <CardContent className="p-0">
             <Tabs
               value={activeTab}
@@ -152,7 +152,7 @@ export default function Configuracoes() {
                   </TabsTrigger>
                   <TabsTrigger
                     value="mensagens"
-                    className="rounded-lg bg-gray-200 text-gray-700 hover:bg-gray-300 data-[state=active]:bg-blue-600 data-[state=active]:text-white px-6 py-3 text-base font-medium"
+                    className="rounded-lg bg-gray-200 dark:bg-slate-800 text-gray-700 dark:text-slate-300 hover:bg-gray-300 dark:hover:bg-slate-700 data-[state=active]:bg-blue-600 data-[state=active]:text-white px-6 py-3 text-base font-medium"
                   >
                     <MessageCircle className="w-5 h-5 mr-2" />
                     Templates de Mensagem
@@ -162,7 +162,7 @@ export default function Configuracoes() {
 
               <TabsContent value="procedimentos" className="p-6 space-y-6">
                 <div className="flex justify-between items-center mb-4">
-                  <h3 className="text-xl font-bold text-slate-800">
+                  <h3 className="text-xl font-bold text-slate-800 dark:text-slate-100">
                     Lista de Procedimentos
                   </h3>
                   <Button
@@ -183,7 +183,7 @@ export default function Configuracoes() {
 
               <TabsContent value="mensagens" className="p-6 space-y-6">
                 <div className="flex justify-between items-center mb-4">
-                  <h3 className="text-xl font-bold text-slate-800">
+                  <h3 className="text-xl font-bold text-slate-800 dark:text-slate-100">
                     Lista de Templates
                   </h3>
                   <Button

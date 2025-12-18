@@ -24,7 +24,7 @@ import toast from "react-hot-toast";
 const PecaRow = ({ peca, fornecedores, onEdit, onDelete }) => {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
-  
+
   const fornecedor = fornecedores.find((f) => f.id === peca.fornecedorId);
   const quantidade = Number(peca.quantidade || peca.estoqueAtual || 0);
   const estoqueMinimo = Number(peca.estoqueMinimo || 0);
@@ -33,7 +33,7 @@ const PecaRow = ({ peca, fornecedores, onEdit, onDelete }) => {
   const handleDelete = async () => {
     setIsDeleting(true);
     const toastId = toast.loading('Excluindo peça...');
-    
+
     try {
       await deletePeca(peca.id);
       toast.success('Peça excluída com sucesso! 🎉', { id: toastId });
@@ -48,10 +48,10 @@ const PecaRow = ({ peca, fornecedores, onEdit, onDelete }) => {
 
   return (
     <>
-      <TableRow className="bg-white hover:bg-slate-50">
+      <TableRow className="bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800">
         <TableCell>
-          <div className="font-medium text-slate-800">{peca.nome}</div>
-          <div className="text-sm text-slate-500">
+          <div className="font-medium text-slate-800 dark:text-slate-100">{peca.nome}</div>
+          <div className="text-sm text-slate-500 dark:text-slate-400">
             SKU: {peca.sku || peca.codigoFabricante}
           </div>
         </TableCell>
@@ -60,28 +60,28 @@ const PecaRow = ({ peca, fornecedores, onEdit, onDelete }) => {
             {quantidade} em estoque
           </Badge>
         </TableCell>
-        <TableCell className="text-slate-600">
+        <TableCell className="text-slate-600 dark:text-slate-300">
           {fornecedor?.nome || "Não informado"}
         </TableCell>
-        <TableCell className="font-medium text-slate-800">
+        <TableCell className="font-medium text-slate-800 dark:text-slate-100">
           R$ {Number(peca.precoVenda || 0).toFixed(2)}
         </TableCell>
         <TableCell className="text-right">
           <div className="flex items-center justify-end gap-2">
-            <Button 
-              variant="ghost" 
-              size="icon" 
+            <Button
+              variant="ghost"
+              size="icon"
               onClick={() => onEdit(peca)}
               title="Editar peça"
             >
               <Edit className="w-4 h-4" />
             </Button>
-            
-            <Button 
-              variant="ghost" 
-              size="icon" 
+
+            <Button
+              variant="ghost"
+              size="icon"
               onClick={() => setShowDeleteConfirm(true)}
-              className="hover:bg-red-50 hover:text-red-600"
+              className="hover:bg-red-50 dark:hover:bg-red-900/30 hover:text-red-600 dark:hover:text-red-400"
               title="Excluir peça"
             >
               <Trash2 className="w-4 h-4" />
@@ -107,15 +107,15 @@ const PecaRow = ({ peca, fornecedores, onEdit, onDelete }) => {
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               onClick={() => setShowDeleteConfirm(false)}
               disabled={isDeleting}
             >
               Cancelar
             </Button>
-            <Button 
-              variant="destructive" 
+            <Button
+              variant="destructive"
               onClick={handleDelete}
               disabled={isDeleting}
             >
@@ -132,8 +132,8 @@ const EmptyState = () => (
   <TableRow>
     <TableCell colSpan={5} className="h-48 text-center">
       <Package className="w-12 h-12 mx-auto text-slate-300 mb-4" />
-      <h3 className="font-semibold text-slate-700">Nenhuma peça encontrada</h3>
-      <p className="text-sm text-slate-500">
+      <h3 className="font-semibold text-slate-700 dark:text-slate-200">Nenhuma peça encontrada</h3>
+      <p className="text-sm text-slate-500 dark:text-slate-400">
         Tente ajustar os filtros ou adicione uma nova peça.
       </p>
     </TableCell>
@@ -142,9 +142,9 @@ const EmptyState = () => (
 
 export default function PecasListTable({ pecas, fornecedores, onEditPeca, onDeletePeca }) {
   return (
-    <div className="border border-slate-200 rounded-xl">
+    <div className="border border-slate-200 dark:border-slate-800 rounded-xl">
       <Table>
-        <TableHeader className="bg-slate-50">
+        <TableHeader className="bg-slate-50 dark:bg-slate-800">
           <TableRow>
             <TableHead className="w-[40%]">Peça</TableHead>
             <TableHead>Estoque</TableHead>

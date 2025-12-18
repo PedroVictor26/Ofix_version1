@@ -34,6 +34,7 @@ import {
 import { Toaster } from 'react-hot-toast';
 import toast from 'react-hot-toast';
 import VirtualAssistant from './components/ai/VirtualAssistant.jsx';
+import { ThemeToggle } from "./components/ui/ThemeToggle";
 
 // --- Constantes ---
 const NAVIGATION_ITEMS = [
@@ -99,22 +100,22 @@ const SystemStatusPanel = ({ onEstoqueBaixoClick }) => {
             </SidebarGroupLabel>
             <SidebarGroupContent>
                 <div className="px-3 py-2 space-y-4">
-                    <div className="flex items-center justify-between p-3 bg-gradient-to-r from-blue-50 to-blue-100 rounded-lg border border-blue-200">
+                    <div className="flex items-center justify-between p-3 bg-gradient-to-r from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20 rounded-lg border border-blue-200 dark:border-blue-800">
                         <div>
-                            <span className="text-sm font-medium text-slate-700">Serviços Ativos</span>
-                            <div className="text-xs text-slate-500">Em andamento</div>
+                            <span className="text-sm font-medium text-slate-700 dark:text-slate-200">Serviços Ativos</span>
+                            <div className="text-xs text-slate-500 dark:text-slate-400">Em andamento</div>
                         </div>
                         <span className="font-bold text-blue-600 bg-blue-200 px-3 py-1 rounded-full text-sm">
                             {servicosAtivos}
                         </span>
                     </div>
-                    <div 
+                    <div
                         onClick={() => onEstoqueBaixoClick()}
-                        className="flex items-center justify-between p-3 bg-gradient-to-r from-orange-50 to-orange-100 rounded-lg border border-orange-200 cursor-pointer hover:from-orange-100 hover:to-orange-200 transition-all duration-200"
+                        className="flex items-center justify-between p-3 bg-gradient-to-r from-orange-50 to-orange-100 dark:from-orange-900/20 dark:to-orange-800/20 rounded-lg border border-orange-200 dark:border-orange-800 cursor-pointer hover:from-orange-100 hover:to-orange-200 dark:hover:from-orange-900/30 dark:hover:to-orange-800/30 transition-all duration-200"
                     >
                         <div>
-                            <span className="text-sm font-medium text-slate-700">Estoque Baixo</span>
-                            <div className="text-xs text-slate-500">
+                            <span className="text-sm font-medium text-slate-700 dark:text-slate-200">Estoque Baixo</span>
+                            <div className="text-xs text-slate-500 dark:text-slate-400">
                                 {estoqueBaixo > 0 ? 'Clique para ver detalhes' : 'Requer atenção'}
                             </div>
                         </div>
@@ -122,15 +123,6 @@ const SystemStatusPanel = ({ onEstoqueBaixoClick }) => {
                             {estoqueBaixo}
                         </span>
                     </div>
-                    {/* Faturamento comentado por enquanto conforme solicitado
-                    <div className="flex items-center justify-between p-3 bg-gradient-to-r from-green-50 to-green-100 rounded-lg border border-green-200">
-                        <div>
-                            <span className="text-sm font-medium text-slate-700">Faturamento Hoje</span>
-                            <div className="text-xs text-slate-500">Receita atual</div>
-                        </div>
-                        <span className="font-bold text-green-600 text-sm">R$ 0,00</span>
-                    </div>
-                    */}
                 </div>
             </SidebarGroupContent>
         </SidebarGroup>
@@ -138,7 +130,7 @@ const SystemStatusPanel = ({ onEstoqueBaixoClick }) => {
 };
 
 const UserPanel = ({ user, isAuthenticated, isLoadingAuth, logout }) => (
-    <div className="flex items-center gap-3 p-3 bg-white rounded-xl shadow-sm border border-slate-100">
+    <div className="flex items-center gap-3 p-3 bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-100 dark:border-slate-700">
         <div className="relative">
             <div className="w-10 h-10 bg-gradient-to-br from-slate-600 to-slate-700 rounded-full flex items-center justify-center shadow-md">
                 <span className="text-white font-semibold text-sm">
@@ -148,10 +140,10 @@ const UserPanel = ({ user, isAuthenticated, isLoadingAuth, logout }) => (
             <div className={`absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2 border-white ${isAuthenticated ? 'bg-green-500' : 'bg-slate-400'}`}></div>
         </div>
         <div className="flex-1 min-w-0">
-            <p className="font-semibold text-slate-900 text-sm truncate">
+            <p className="font-semibold text-slate-900 dark:text-slate-100 text-sm truncate">
                 {isLoadingAuth ? "Carregando..." : (isAuthenticated && user?.nome ? user.nome : "Visitante")}
             </p>
-            <p className="text-xs text-slate-500 truncate">
+            <p className="text-xs text-slate-500 dark:text-slate-400 truncate">
                 {isAuthenticated && user?.role
                     ? user.role.replace('_', ' ').toLowerCase().replace(/\b\w/g, l => l.toUpperCase())
                     : "Não autenticado"}
@@ -163,7 +155,7 @@ const UserPanel = ({ user, isAuthenticated, isLoadingAuth, logout }) => (
                 size="icon"
                 onClick={logout}
                 aria-label="Sair"
-                className="text-slate-500 hover:text-red-600 hover:bg-red-100 rounded-lg transition-all duration-200"
+                className="text-slate-500 dark:text-slate-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/30 rounded-lg transition-all duration-200"
             >
                 <LogOut className="w-5 h-5" />
             </Button>
@@ -172,7 +164,7 @@ const UserPanel = ({ user, isAuthenticated, isLoadingAuth, logout }) => (
             variant="ghost"
             size="icon"
             aria-label="Notificações"
-            className="text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-all duration-200"
+            className="text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-all duration-200"
         >
             <Bell className="w-5 h-5" />
         </Button>
@@ -213,12 +205,12 @@ export default function Layout() {
     // Calcular notificações (peças com estoque baixo + serviços atrasados)
     const notificationsCount = useMemo(() => {
         let count = 0;
-        
+
         // Contar peças com estoque baixo
         if (pecasEstoqueBaixo) {
             count += pecasEstoqueBaixo.length;
         }
-        
+
         // Contar serviços atrasados (exemplo: mais de 7 dias)
         if (servicos) {
             const servicosAtrasados = servicos.filter(servico => {
@@ -230,7 +222,7 @@ export default function Layout() {
             });
             count += servicosAtrasados.length;
         }
-        
+
         return count;
     }, [pecasEstoqueBaixo, servicos]);
 
@@ -283,14 +275,14 @@ export default function Layout() {
                 }}
             />
 
-            <div className="min-h-screen w-full bg-gradient-to-br from-slate-50 to-blue-50 flex flex-col">
+            <div className="min-h-screen w-full bg-gradient-to-br from-slate-50 to-blue-50 dark:from-slate-950 dark:to-slate-900 flex flex-col">
 
                 {/* Header Global Fixo */}
-                <header className="bg-white/95 backdrop-blur-md border-b border-slate-200/60 shadow-sm z-30 flex-shrink-0 sticky top-0">
+                <header className="bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-b border-slate-200/60 dark:border-slate-800/60 shadow-sm z-30 flex-shrink-0 sticky top-0">
                     <div className="flex items-center justify-between h-16">
                         <div className="flex items-center gap-4 px-6">
                             <SidebarTrigger className="md:hidden hover:bg-slate-100 p-2 rounded-lg transition-colors duration-200" />
-                            
+
                             <div className="flex items-center gap-3">
                                 <div className="w-8 h-8 bg-gradient-to-r from-blue-600 to-blue-700 rounded-lg flex items-center justify-center shadow-md">
                                     <Wrench className="w-4 h-4 text-white" />
@@ -305,7 +297,7 @@ export default function Layout() {
                                             Gestão Completa de Oficina
                                         </p>
                                     </div>
-                                    
+
                                     {/* Versão mobile - apenas OFIX */}
                                     <div className="block sm:hidden">
                                         <h1 className="text-lg font-bold text-slate-900 tracking-tight">
@@ -315,10 +307,10 @@ export default function Layout() {
                                             Sistema
                                         </p>
                                     </div>
-                                    
+
                                     {/* Divisor visual */}
                                     <div className="h-8 md:h-10 w-px bg-slate-300"></div>
-                                    
+
                                     {/* Parte dinâmica - Nome da página */}
                                     <div>
                                         <h2 className="text-base md:text-lg font-semibold text-blue-700 tracking-tight">
@@ -328,160 +320,163 @@ export default function Layout() {
                                             Área atual do sistema
                                         </p>
                                     </div>
-                                </div>
-                            </div>
-                        </div>
-                        <div className="flex items-center gap-3 px-6">
-                            <div className="relative notifications-container">
-                                <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => setShowNotificationsDropdown(!showNotificationsDropdown)}
-                                    aria-label="Notificações"
-                                    className="text-slate-500 hover:text-slate-700 hover:bg-blue-100 rounded-lg transition-all duration-200 p-3"
-                                >
-                                    <Bell className="w-5 h-5" />
-                                </Button>
-                                {/* Badge de notificações */}
-                                {notificationsCount > 0 && (
-                                    <div className="absolute -top-1 -right-1 min-w-[20px] h-5 bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center px-1.5 shadow-lg">
-                                        {notificationsCount > 99 ? '99+' : notificationsCount}
-                                    </div>
-                                )}
 
-                                {/* Dropdown de Notificações */}
-                                {showNotificationsDropdown && (
-                                    <div className="absolute right-0 top-full mt-2 w-80 bg-white rounded-xl shadow-2xl border border-slate-200 z-50">
-                                        {/* Header do Dropdown */}
-                                        <div className="flex items-center justify-between p-4 border-b border-slate-200 bg-gradient-to-r from-blue-50 to-blue-100">
-                                            <h3 className="text-lg font-semibold text-slate-900">Notificações</h3>
-                                            <button
-                                                onClick={() => setShowNotificationsDropdown(false)}
-                                                className="p-1 hover:bg-slate-100 rounded-lg transition-colors duration-200"
-                                            >
-                                                <X className="w-4 h-4 text-slate-500" />
-                                            </button>
-                                        </div>
+                                    {/* Theme Toggle */}
+                                    <ThemeToggle />
 
-                                        {/* Lista de Notificações */}
-                                        <div className="max-h-96 overflow-y-auto">
-                                            {notificationsCount > 0 ? (
-                                                <div className="p-2">
-                                                    {/* Notificações de Estoque Baixo */}
-                                                    {pecasEstoqueBaixo.length > 0 && (
-                                                        <div className="space-y-1">
-                                                            <div className="px-3 py-2 text-xs font-semibold text-orange-600 uppercase tracking-wider">
-                                                                Estoque Baixo ({pecasEstoqueBaixo.length})
-                                                            </div>
-                                                            {pecasEstoqueBaixo.slice(0, 3).map((peca, index) => (
-                                                                <div 
-                                                                    key={peca.id || index}
-                                                                    onClick={() => {
-                                                                        setShowNotificationsDropdown(false);
-                                                                        setShowEstoqueBaixoModal(true);
-                                                                    }}
-                                                                    className="flex items-center gap-3 p-3 hover:bg-orange-50 rounded-lg cursor-pointer transition-colors duration-200"
-                                                                >
-                                                                    <div className="w-2 h-2 bg-orange-500 rounded-full flex-shrink-0"></div>
-                                                                    <div className="flex-1 min-w-0">
-                                                                        <p className="text-sm font-medium text-slate-900 truncate">
-                                                                            {peca.nome || peca.descricao || 'Peça sem nome'}
-                                                                        </p>
-                                                                        <p className="text-xs text-slate-500">
-                                                                            Estoque: {Number(peca.quantidade || peca.estoqueAtual || 0)} (Mín: {Number(peca.estoqueMinimo || 0)})
-                                                                        </p>
+                                    <div className="relative notifications-container">
+                                        <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            onClick={() => setShowNotificationsDropdown(!showNotificationsDropdown)}
+                                            aria-label="Notificações"
+                                            className="text-slate-500 hover:text-slate-700 hover:bg-blue-100 rounded-lg transition-all duration-200"
+                                        >
+                                            <Bell className="w-5 h-5" />
+                                        </Button>
+
+                                        {/* Badge de notificações */}
+                                        {notificationsCount > 0 && (
+                                            <div className="absolute -top-1 -right-1 min-w-[20px] h-5 bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center px-1.5 shadow-lg">
+                                                {notificationsCount > 99 ? '99+' : notificationsCount}
+                                            </div>
+                                        )}
+
+                                        {/* Dropdown de Notificações */}
+                                        {showNotificationsDropdown && (
+                                            <div className="absolute right-0 top-full mt-2 w-80 bg-white rounded-xl shadow-2xl border border-slate-200 z-50">
+                                                {/* Header do Dropdown */}
+                                                <div className="flex items-center justify-between p-4 border-b border-slate-200 bg-gradient-to-r from-blue-50 to-blue-100">
+                                                    <h3 className="text-lg font-semibold text-slate-900">Notificações</h3>
+                                                    <button
+                                                        onClick={() => setShowNotificationsDropdown(false)}
+                                                        className="p-1 hover:bg-slate-100 rounded-lg transition-colors duration-200"
+                                                    >
+                                                        <X className="w-4 h-4 text-slate-500" />
+                                                    </button>
+                                                </div>
+
+                                                {/* Lista de Notificações */}
+                                                <div className="max-h-96 overflow-y-auto">
+                                                    {notificationsCount > 0 ? (
+                                                        <div className="p-2">
+                                                            {/* Notificações de Estoque Baixo */}
+                                                            {pecasEstoqueBaixo.length > 0 && (
+                                                                <div className="space-y-1">
+                                                                    <div className="px-3 py-2 text-xs font-semibold text-orange-600 uppercase tracking-wider">
+                                                                        Estoque Baixo ({pecasEstoqueBaixo.length})
                                                                     </div>
-                                                                </div>
-                                                            ))}
-                                                            {pecasEstoqueBaixo.length > 3 && (
-                                                                <div 
-                                                                    onClick={() => {
-                                                                        setShowNotificationsDropdown(false);
-                                                                        setShowEstoqueBaixoModal(true);
-                                                                    }}
-                                                                    className="p-3 text-center text-sm text-orange-600 hover:bg-orange-50 rounded-lg cursor-pointer transition-colors duration-200"
-                                                                >
-                                                                    Ver mais {pecasEstoqueBaixo.length - 3} peças...
+                                                                    {pecasEstoqueBaixo.slice(0, 3).map((peca, index) => (
+                                                                        <div
+                                                                            key={peca.id || index}
+                                                                            onClick={() => {
+                                                                                setShowNotificationsDropdown(false);
+                                                                                setShowEstoqueBaixoModal(true);
+                                                                            }}
+                                                                            className="flex items-center gap-3 p-3 hover:bg-orange-50 rounded-lg cursor-pointer transition-colors duration-200"
+                                                                        >
+                                                                            <div className="w-2 h-2 bg-orange-500 rounded-full flex-shrink-0"></div>
+                                                                            <div className="flex-1 min-w-0">
+                                                                                <p className="text-sm font-medium text-slate-900 truncate">
+                                                                                    {peca.nome || peca.descricao || 'Peça sem nome'}
+                                                                                </p>
+                                                                                <p className="text-xs text-slate-500">
+                                                                                    Estoque: {Number(peca.quantidade || peca.estoqueAtual || 0)} (Mín: {Number(peca.estoqueMinimo || 0)})
+                                                                                </p>
+                                                                            </div>
+                                                                        </div>
+                                                                    ))}
+                                                                    {pecasEstoqueBaixo.length > 3 && (
+                                                                        <div
+                                                                            onClick={() => {
+                                                                                setShowNotificationsDropdown(false);
+                                                                                setShowEstoqueBaixoModal(true);
+                                                                            }}
+                                                                            className="p-3 text-center text-sm text-orange-600 hover:bg-orange-50 rounded-lg cursor-pointer transition-colors duration-200"
+                                                                        >
+                                                                            Ver mais {pecasEstoqueBaixo.length - 3} peças...
+                                                                        </div>
+                                                                    )}
                                                                 </div>
                                                             )}
-                                                        </div>
-                                                    )}
 
-                                                    {/* Notificações de Serviços Atrasados */}
-                                                    {servicos && servicos.filter(servico => {
-                                                        const dataInicio = new Date(servico.dataInicio);
-                                                        const hoje = new Date();
-                                                        const diasDecorridos = Math.floor((hoje - dataInicio) / (1000 * 60 * 60 * 24));
-                                                        return servico.status !== 'FINALIZADO' && diasDecorridos > 7;
-                                                    }).length > 0 && (
-                                                        <div className="space-y-1 mt-4">
-                                                            <div className="px-3 py-2 text-xs font-semibold text-red-600 uppercase tracking-wider">
-                                                                Serviços Atrasados
-                                                            </div>
-                                                            {servicos.filter(servico => {
+                                                            {/* Notificações de Serviços Atrasados */}
+                                                            {servicos && servicos.filter(servico => {
                                                                 const dataInicio = new Date(servico.dataInicio);
                                                                 const hoje = new Date();
                                                                 const diasDecorridos = Math.floor((hoje - dataInicio) / (1000 * 60 * 60 * 24));
                                                                 return servico.status !== 'FINALIZADO' && diasDecorridos > 7;
-                                                            }).slice(0, 2).map((servico, index) => {
-                                                                const dataInicio = new Date(servico.dataInicio);
-                                                                const hoje = new Date();
-                                                                const diasDecorridos = Math.floor((hoje - dataInicio) / (1000 * 60 * 60 * 24));
-                                                                return (
-                                                                    <div 
-                                                                        key={servico.id || index}
-                                                                        className="flex items-center gap-3 p-3 hover:bg-red-50 rounded-lg cursor-pointer transition-colors duration-200"
-                                                                    >
-                                                                        <div className="w-2 h-2 bg-red-500 rounded-full flex-shrink-0"></div>
-                                                                        <div className="flex-1 min-w-0">
-                                                                            <p className="text-sm font-medium text-slate-900 truncate">
-                                                                                OS #{servico.numeroOS || servico.id}
-                                                                            </p>
-                                                                            <p className="text-xs text-slate-500">
-                                                                                {diasDecorridos} dias em andamento
-                                                                            </p>
+                                                            }).length > 0 && (
+                                                                    <div className="space-y-1 mt-4">
+                                                                        <div className="px-3 py-2 text-xs font-semibold text-red-600 uppercase tracking-wider">
+                                                                            Serviços Atrasados
                                                                         </div>
+                                                                        {servicos.filter(servico => {
+                                                                            const dataInicio = new Date(servico.dataInicio);
+                                                                            const hoje = new Date();
+                                                                            const diasDecorridos = Math.floor((hoje - dataInicio) / (1000 * 60 * 60 * 24));
+                                                                            return servico.status !== 'FINALIZADO' && diasDecorridos > 7;
+                                                                        }).slice(0, 2).map((servico, index) => {
+                                                                            const dataInicio = new Date(servico.dataInicio);
+                                                                            const hoje = new Date();
+                                                                            const diasDecorridos = Math.floor((hoje - dataInicio) / (1000 * 60 * 60 * 24));
+                                                                            return (
+                                                                                <div
+                                                                                    key={servico.id || index}
+                                                                                    className="flex items-center gap-3 p-3 hover:bg-red-50 rounded-lg cursor-pointer transition-colors duration-200"
+                                                                                >
+                                                                                    <div className="w-2 h-2 bg-red-500 rounded-full flex-shrink-0"></div>
+                                                                                    <div className="flex-1 min-w-0">
+                                                                                        <p className="text-sm font-medium text-slate-900 truncate">
+                                                                                            OS #{servico.numeroOS || servico.id}
+                                                                                        </p>
+                                                                                        <p className="text-xs text-slate-500">
+                                                                                            {diasDecorridos} dias em andamento
+                                                                                        </p>
+                                                                                    </div>
+                                                                                </div>
+                                                                            );
+                                                                        })}
                                                                     </div>
-                                                                );
-                                                            })}
+                                                                )}
+                                                        </div>
+                                                    ) : (
+                                                        <div className="p-6 text-center">
+                                                            <Bell className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+                                                            <p className="text-slate-500 text-sm">Nenhuma notificação nova</p>
                                                         </div>
                                                     )}
                                                 </div>
-                                            ) : (
-                                                <div className="p-6 text-center">
-                                                    <Bell className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-                                                    <p className="text-slate-500 text-sm">Nenhuma notificação nova</p>
-                                                </div>
-                                            )}
-                                        </div>
 
-                                        {/* Footer do Dropdown */}
-                                        {notificationsCount > 0 && (
-                                            <div className="p-3 border-t border-slate-200 bg-slate-50">
-                                                <button
-                                                    onClick={() => setShowNotificationsDropdown(false)}
-                                                    className="w-full text-sm text-slate-600 hover:text-slate-800 transition-colors duration-200"
-                                                >
-                                                    Fechar notificações
-                                                </button>
+                                                {/* Footer do Dropdown */}
+                                                {notificationsCount > 0 && (
+                                                    <div className="p-3 border-t border-slate-200 bg-slate-50">
+                                                        <button
+                                                            onClick={() => setShowNotificationsDropdown(false)}
+                                                            className="w-full text-sm text-slate-600 hover:text-slate-800 transition-colors duration-200"
+                                                        >
+                                                            Fechar notificações
+                                                        </button>
+                                                    </div>
+                                                )}
                                             </div>
                                         )}
                                     </div>
-                                )}
+
+                                    {/* Botão de Logout no Header */}
+                                    {isAuthenticated && (
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={logout}
+                                            aria-label="Sair da conta"
+                                            className="text-slate-500 hover:text-red-600 hover:bg-red-100 rounded-lg transition-all duration-200 p-3"
+                                        >
+                                            <LogOut className="w-5 h-5" />
+                                        </Button>
+                                    )}
+                                </div>
                             </div>
-                            
-                            {/* Botão de Logout no Header */}
-                            {isAuthenticated && (
-                                <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={logout}
-                                    aria-label="Sair da conta"
-                                    className="text-slate-500 hover:text-red-600 hover:bg-red-100 rounded-lg transition-all duration-200 p-3"
-                                >
-                                    <LogOut className="w-5 h-5" />
-                                </Button>
-                            )}
                         </div>
                     </div>
                 </header>
@@ -489,7 +484,7 @@ export default function Layout() {
                 {/* Container com Sidebar e Conteúdo */}
                 <div className="flex flex-1 h-full overflow-hidden">
                     {/* Sidebar */}
-                    <Sidebar className="border-r border-slate-200/60 bg-white/95 backdrop-blur-md shadow-xl z-20 w-64 flex-shrink-0 fixed h-full top-16 left-0 hidden md:flex md:flex-col">
+                    <Sidebar className="border-r border-slate-200/60 dark:border-slate-800/60 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md shadow-xl z-20 w-64 flex-shrink-0 fixed h-full top-16 left-0 hidden md:flex md:flex-col">
                         <SidebarContent className="p-4 pt-6 flex-1 overflow-y-auto">
                             {/* Menu de navegação */}
                             <SidebarGroup>
@@ -506,22 +501,22 @@ export default function Layout() {
                                                     <SidebarMenuButton
                                                         asChild
                                                         className={`sidebar-transition rounded-xl group ${isActive
-                                                                ? 'nav-item-active text-blue-700'
-                                                                : 'text-slate-600 nav-item-hover hover:text-slate-900'
+                                                            ? 'nav-item-active text-blue-700 dark:text-blue-400'
+                                                            : 'text-slate-600 dark:text-slate-400 nav-item-hover hover:text-slate-900 dark:hover:text-slate-200'
                                                             }`}
                                                     >
                                                         <Link to={item.url} className="flex items-center gap-4 px-4 py-3">
                                                             <div className={`p-2 rounded-lg transition-all duration-200 ${isActive
-                                                                    ? 'bg-blue-500 text-white shadow-lg'
-                                                                    : 'bg-slate-100 group-hover:bg-slate-200'
+                                                                ? 'bg-blue-500 text-white shadow-lg dark:bg-blue-600'
+                                                                : 'bg-slate-100 group-hover:bg-slate-200 dark:bg-slate-800 dark:group-hover:bg-slate-700'
                                                                 }`}>
                                                                 <item.icon className="w-4 h-4" />
                                                             </div>
                                                             <div className="flex-1 min-w-0">
-                                                                <div className={`font-semibold text-sm ${isActive ? 'text-blue-700' : ''}`}>
+                                                                <div className={`font-semibold text-sm ${isActive ? 'text-blue-700 dark:text-blue-400' : ''}`}>
                                                                     {item.title}
                                                                 </div>
-                                                                <div className="text-xs text-slate-500 truncate">
+                                                                <div className="text-xs text-slate-500 dark:text-slate-500 truncate">
                                                                     {item.description}
                                                                 </div>
                                                             </div>
@@ -534,12 +529,12 @@ export default function Layout() {
                                 </SidebarGroupContent>
                             </SidebarGroup>
 
-                            <SystemStatusPanel 
+                            <SystemStatusPanel
                                 onEstoqueBaixoClick={() => setShowEstoqueBaixoModal(true)}
                             />
                         </SidebarContent>
 
-                        <SidebarFooter className="border-t border-slate-200/60 p-4 bg-gradient-to-r from-slate-50 to-gray-50 sticky bottom-0">
+                        <SidebarFooter className="border-t border-slate-200/60 dark:border-slate-800/60 p-4 bg-gradient-to-r from-slate-50 to-gray-50 dark:from-slate-900 dark:to-slate-800 sticky bottom-0">
                             <UserPanel
                                 user={user}
                                 isAuthenticated={isAuthenticated}
@@ -550,10 +545,10 @@ export default function Layout() {
                     </Sidebar>
 
                     {/* Sidebar Mobile - dentro do SidebarProvider já gerencia automaticamente */}
-                    
+
                     {/* Conteúdo principal */}
                     <main className="flex flex-col flex-1 overflow-hidden">
-                        <div className="flex-1 overflow-y-auto bg-gradient-to-br from-slate-50 to-blue-50">
+                        <div className="flex-1 overflow-y-auto bg-gradient-to-br from-slate-50 to-blue-50 dark:from-slate-950 dark:to-slate-900">
                             <Outlet />
                         </div>
                     </main>
@@ -624,8 +619,8 @@ export default function Layout() {
                                         const quantidade = Number(peca.quantidade || peca.estoqueAtual || 0);
                                         const estoqueMinimo = Number(peca.estoqueMinimo || 0);
                                         return (
-                                            <div 
-                                                key={peca.id || index} 
+                                            <div
+                                                key={peca.id || index}
                                                 className="flex items-center justify-between p-4 bg-slate-50 rounded-lg border border-slate-200"
                                             >
                                                 <div className="flex-1">

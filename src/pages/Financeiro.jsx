@@ -52,10 +52,10 @@ export default function FinanceiroPage() {
         <header className="mb-2">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
             <div>
-              <h1 className="text-3xl font-bold text-slate-800">
+              <h1 className="text-3xl font-bold text-slate-800 dark:text-slate-100">
                 Gestão Financeira
               </h1>
-              <p className="text-slate-500 mt-1">
+              <p className="text-slate-500 dark:text-slate-400 mt-1">
                 Acompanhe as entradas e saídas da sua oficina.
               </p>
             </div>
@@ -90,9 +90,9 @@ export default function FinanceiroPage() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Gráfico */}
           <div className="lg:col-span-2">
-            <Card className="bg-white shadow-sm border-slate-200">
+            <Card className="bg-white dark:bg-slate-900 shadow-sm border-slate-200 dark:border-slate-800">
               <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-xl text-slate-800">
+                <CardTitle className="flex items-center gap-2 text-xl text-slate-800 dark:text-slate-100">
                   <BarChart2 className="w-5 h-5" />
                   Fluxo de Caixa
                 </CardTitle>
@@ -105,9 +105,9 @@ export default function FinanceiroPage() {
 
           {/* Tabela de Transações Recentes */}
           <div className="lg:col-span-1">
-            <Card className="bg-white shadow-sm border-slate-200">
+            <Card className="bg-white dark:bg-slate-900 shadow-sm border-slate-200 dark:border-slate-800">
               <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-xl text-slate-800">
+                <CardTitle className="flex items-center gap-2 text-xl text-slate-800 dark:text-slate-100">
                   <TrendingUp className="w-5 h-5" />
                   Transações Recentes
                 </CardTitle>

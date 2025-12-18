@@ -6,7 +6,7 @@ const KanbanBoardSkeleton = ({ statusConfig }) => (
     <div className="flex gap-6 overflow-x-auto pb-4">
         {Object.keys(statusConfig).map((status) => (
             <div key={status} className="flex-shrink-0 w-80">
-                <div className="bg-gradient-to-b from-slate-50 to-slate-100 rounded-xl p-5 shadow-sm border border-slate-200">
+                <div className="bg-gradient-to-b from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 rounded-xl p-5 shadow-sm border border-slate-200 dark:border-slate-700">
                     <div className="flex items-center justify-between mb-5">
                         <div className="flex items-center gap-3">
                             <Skeleton className="h-10 w-10 rounded-lg" />

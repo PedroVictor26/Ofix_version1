@@ -14,7 +14,7 @@ export default function KanbanColumn({ status, config, servicos, serviceIds, cli
 
     return (
         <div className="flex-shrink-0 w-80">
-            <div className="bg-gradient-to-b from-slate-50 to-slate-100 rounded-xl p-5 shadow-sm border border-slate-200">
+            <div className="bg-gradient-to-b from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 rounded-xl p-5 shadow-sm border border-slate-200 dark:border-slate-700">
                 {/* Cabeçalho da Coluna - Redesign */}
                 <div className="flex items-center justify-between mb-5">
                     <div className="flex items-center gap-3">
@@ -22,15 +22,15 @@ export default function KanbanColumn({ status, config, servicos, serviceIds, cli
                             <config.icon className="w-5 h-5" />
                         </div>
                         <div>
-                            <h3 className="font-bold text-slate-800 text-base">{config.title}</h3>
-                            <p className="text-xs text-slate-500">
+                            <h3 className="font-bold text-slate-800 dark:text-slate-100 text-base">{config.title}</h3>
+                            <p className="text-xs text-slate-500 dark:text-slate-400">
                                 {servicos?.length || 0} {(servicos?.length || 0) === 1 ? 'serviço' : 'serviços'}
                             </p>
                         </div>
                     </div>
-                    <Badge 
-                        variant="secondary" 
-                        className="text-sm font-bold px-3 py-1 bg-white/80 text-slate-700 shadow-sm"
+                    <Badge
+                        variant="secondary"
+                        className="text-sm font-bold px-3 py-1 bg-white/80 dark:bg-slate-800/80 text-slate-700 dark:text-slate-200 shadow-sm"
                     >
                         {servicos?.length || 0}
                     </Badge>
@@ -39,9 +39,8 @@ export default function KanbanColumn({ status, config, servicos, serviceIds, cli
                 {/* Área dos Cards */}
                 <ScrollArea
                     ref={setNodeRef}
-                    className={`h-[calc(100vh-320px)] rounded-lg transition-all duration-200 ${
-                        isOver ? 'bg-blue-50 border-2 border-dashed border-blue-300' : 'bg-transparent'
-                    }`}
+                    className={`h-[calc(100vh-320px)] rounded-lg transition-all duration-200 ${isOver ? 'bg-blue-50 dark:bg-blue-900/20 border-2 border-dashed border-blue-300 dark:border-blue-700' : 'bg-transparent'
+                        }`}
                 >
                     <SortableContext items={serviceIds || []} strategy={verticalListSortingStrategy}>
                         <div className="space-y-4 p-2">
@@ -68,11 +67,11 @@ export default function KanbanColumn({ status, config, servicos, serviceIds, cli
                                 })
                             ) : (
                                 <div className="text-center py-12 min-h-[200px] flex flex-col items-center justify-center">
-                                    <div className="w-16 h-16 bg-slate-200 rounded-full flex items-center justify-center mb-4">
+                                    <div className="w-16 h-16 bg-slate-200 dark:bg-slate-800 rounded-full flex items-center justify-center mb-4">
                                         <config.icon className="w-8 h-8 text-slate-400" />
                                     </div>
-                                    <p className="text-sm text-slate-500 font-medium">Nenhum serviço aqui</p>
-                                    <p className="text-xs text-slate-400 mt-1">Arraste os cards para esta coluna</p>
+                                    <p className="text-sm text-slate-500 dark:text-slate-400 font-medium">Nenhum serviço aqui</p>
+                                    <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">Arraste os cards para esta coluna</p>
                                 </div>
                             )}
                         </div>

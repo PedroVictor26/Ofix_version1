@@ -32,10 +32,10 @@ const ErrorState = ({ error, onRetry }) => (
   <div className="flex items-center justify-center min-h-[60vh]">
     <div className="text-center p-8">
       <AlertCircle className="w-12 h-12 text-red-400 mx-auto mb-4" />
-      <h2 className="text-xl font-semibold text-slate-700 mb-2">
+      <h2 className="text-xl font-semibold text-slate-700 dark:text-slate-200 mb-2">
         Oops! Algo deu errado.
       </h2>
-      <p className="text-slate-500 mb-6">
+      <p className="text-slate-500 dark:text-slate-400 mb-6">
         Não foi possível carregar os dados do dashboard.
       </p>
       <Button onClick={onRetry} variant="destructive">
@@ -221,11 +221,11 @@ export default function Dashboard() {
         <div className="w-full">
           {/* Barra de Busca e Nova OS */}
           <section className="mb-6">
-            <div className="bg-white rounded-xl p-4 shadow-sm border border-slate-200">
+            <div className="bg-white dark:bg-slate-900 rounded-xl p-4 shadow-sm border border-slate-200 dark:border-slate-800">
               <div className="flex items-center gap-4 mb-4">
                 <div className="flex-1">
-                  <h2 className="text-lg font-semibold text-slate-800 mb-1">Buscar Serviços</h2>
-                  <p className="text-sm text-slate-500">
+                  <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-100 mb-1">Buscar Serviços</h2>
+                  <p className="text-sm text-slate-500 dark:text-slate-400">
                     {searchTerm
                       ? `Mostrando ${stats.total} de ${stats.totalGeral} serviços`
                       : "Visualize e gerencie os serviços da sua oficina."
@@ -254,7 +254,7 @@ export default function Dashboard() {
                       }}
                       variant="outline"
                       size="lg"
-                      className="min-h-[48px] touch-manipulation border-blue-200 text-blue-700 hover:bg-blue-50"
+                      className="min-h-[48px] touch-manipulation border-blue-200 text-blue-700 hover:bg-blue-50 dark:border-blue-800 dark:text-blue-400 dark:hover:bg-blue-900/30"
                     >
                       <Share2 className="w-5 h-5 mr-2" />
                       Convidar
@@ -270,21 +270,21 @@ export default function Dashboard() {
                     placeholder="🔍 Buscar por cliente, veículo, placa ou OS # (Ctrl+K)"
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className="w-full pl-10 pr-10 py-3 text-sm border border-slate-200 focus:border-blue-400 focus:ring-2 focus:ring-blue-400 focus:outline-none rounded-lg"
+                    className="w-full pl-10 pr-10 py-3 text-sm border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100 focus:border-blue-400 focus:ring-2 focus:ring-blue-400 focus:outline-none rounded-lg placeholder:text-slate-400 dark:placeholder:text-slate-500"
                   />
                   {searchTerm && (
                     <Button
                       variant="ghost"
                       size="sm"
                       onClick={clearSearch}
-                      className="absolute right-2 top-1/2 transform -translate-y-1/2 h-6 w-6 p-0 hover:bg-slate-100 rounded-full"
+                      className="absolute right-2 top-1/2 transform -translate-y-1/2 h-6 w-6 p-0 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full"
                     >
                       <X className="w-3 h-3" />
                     </Button>
                   )}
                 </div>
                 {searchTerm && (
-                  <div className="text-sm text-slate-600 whitespace-nowrap">
+                  <div className="text-sm text-slate-600 dark:text-slate-400 whitespace-nowrap">
                     <span className="font-medium">{stats.total}</span> de{" "}
                     <span className="font-medium">{stats.totalGeral}</span> serviços
                   </div>
@@ -292,14 +292,14 @@ export default function Dashboard() {
               </div>
 
               {searchTerm && stats.total === 0 && (
-                <div className="mt-4 p-4 bg-slate-50 rounded-lg border border-slate-200">
+                <div className="mt-4 p-4 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-slate-200 dark:border-slate-700">
                   <div className="flex items-center gap-3">
                     <AlertCircle className="w-5 h-5 text-slate-400" />
                     <div>
-                      <p className="text-sm font-medium text-slate-700">
+                      <p className="text-sm font-medium text-slate-700 dark:text-slate-300">
                         Nenhum serviço encontrado
                       </p>
-                      <p className="text-xs text-slate-500 mt-1">
+                      <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
                         Tente buscar por: nome do cliente, marca/modelo do veículo, placa ou número da OS
                       </p>
                     </div>

@@ -11,7 +11,7 @@ const feedbackLog = [];
 // Função de fallback para análise de triagem
 async function analyzeWithFallback(transcricao) {
 	const text = transcricao.toLowerCase();
-	
+
 	// Análise baseada em palavras-chave
 	let categoria = 'geral';
 	let complexidade = 'media';
@@ -19,7 +19,7 @@ async function analyzeWithFallback(transcricao) {
 	let tempo = 2;
 	let pecas = ['Diagnóstico necessário'];
 	let sintomas = [];
-	
+
 	// Categorização por palavras-chave
 	if (text.includes('freio') || text.includes('para') || text.includes('pedal')) {
 		categoria = 'freios';
@@ -57,12 +57,12 @@ async function analyzeWithFallback(transcricao) {
 		tempo = 5;
 		pecas = ['Óleo de câmbio', 'Disco de embreagem'];
 	}
-	
+
 	// Verificar urgência geral
 	if (text.includes('urgente') || text.includes('parou') || text.includes('não anda')) {
 		urgencia = 'emergencia';
 	}
-	
+
 	return {
 		categoria_principal: categoria,
 		categoria_secundaria: 'análise_básica',
@@ -83,7 +83,7 @@ export async function health(req, res) {
 		if (!knowledgeBase.initialized) {
 			await knowledgeBase.initialize();
 		}
-	return res.json({ status: 'ok', kbInitialized: true, time: new Date().toISOString() });
+		return res.json({ status: 'ok', kbInitialized: true, time: new Date().toISOString() });
 	} catch (err) {
 		return res.status(500).json({ status: 'error', message: err.message });
 	}
@@ -114,26 +114,54 @@ export async function chat(req, res) {
 		}
 
 		// Resolve conversation
-	const id = conversationId || `conv_${Date.now()}`;
+		const id = conversationId || `conv_${Date.now()}`;
 		if (!conversations.has(id)) {
 			conversations.set(id, { id, messages: [], context: { userType, ...context }, createdAt: new Date() });
 		}
 		const conv = conversations.get(id);
 		conv.messages.push({ id: Date.now(), type: 'user', content: message, createdAt: new Date() });
 
-		// Simple KB-based response for MVP
-		const kbResults = await knowledgeBase.search(message, { limit: 1, user_context: context });
-		const top = kbResults[0];
-		const responseText = top ? `${top.title}\n\n${top.content}` : 'Entendi. Poderia detalhar um pouco mais para eu ajudar melhor?';
+		let responseText = '';
+		let confidence = 0.8;
+		let metadata = { source: 'python-agent' };
+
+		// TENTATIVA 1: Chamar Agente Python (Matias Team)
+		try {
+			const pythonResponse = await fetch('http://localhost:8000/chat', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					message,
+					session_id: id,
+					user_id: req.user?.id || 'anonymous'
+				})
+			});
+
+			if (pythonResponse.ok) {
+				const data = await pythonResponse.json();
+				responseText = data.response;
+			} else {
+				throw new Error(`Python API error: ${pythonResponse.statusText}`);
+			}
+		} catch (pyError) {
+			console.warn('⚠️ Falha ao chamar Agente Python, usando fallback:', pyError.message);
+
+			// FALLBACK: Lógica antiga (KB Search)
+			const kbResults = await knowledgeBase.search(message, { limit: 1, user_context: context });
+			const top = kbResults[0];
+			responseText = top ? `${top.title}\n\n${top.content}` : 'Entendi. Poderia detalhar um pouco mais para eu ajudar melhor?';
+			confidence = top?.confidence ?? 0.6;
+			metadata = { source: top ? 'knowledge-base' : 'generic', kbId: top?.id };
+		}
 
 		const payload = {
 			conversationId: id,
 			response: responseText,
-			confidence: top?.confidence ?? 0.6,
+			confidence,
 			suggestions: (await knowledgeBase.search(message, { limit: 3, user_context: context }))
 				.map(r => ({ text: r.title, category: r.category, confidence: r.confidence })),
 			context: conv.context,
-			metadata: { source: top ? 'knowledge-base' : 'generic', kbId: top?.id }
+			metadata
 		};
 
 		conv.messages.push({ id: Date.now() + 1, type: 'assistant', content: payload.response, createdAt: new Date(), confidence: payload.confidence, metadata: payload.metadata });
@@ -338,7 +366,7 @@ export async function triagemVoz(req, res) {
 		// multer provides file in req.file
 		const file = req.file; // buffer in memory
 		const { clienteTelefone, veiculoPlaca, providerPreference } = req.body || {};
-		
+
 		if (!file) {
 			return res.status(400).json({ error: 'Arquivo de áudio é obrigatório' });
 		}
@@ -349,7 +377,7 @@ export async function triagemVoz(req, res) {
 			// 1. Tentar transcrição com IA
 			let transcricao;
 			let provider;
-			
+
 			try {
 				provider = aiProviderFactory.getProvider(providerPreference);
 				const transcriptionResult = await provider.transcribeAudio(file.buffer);
@@ -377,7 +405,7 @@ export async function triagemVoz(req, res) {
 				console.log(`🔍 Análise IA completa: ${analise.categoria_principal} (${analise.confianca_analise}%)`);
 			} catch (analysisError) {
 				console.warn('⚠️ Falha na análise de IA, usando fallback:', analysisError.message);
-				
+
 				// Fallback simples baseado em palavras-chave
 				analise = await analyzeWithFallback(transcricao);
 			}
@@ -402,7 +430,7 @@ export async function triagemVoz(req, res) {
 
 		} catch (processingError) {
 			console.error('❌ Erro no processamento da triagem:', processingError);
-			
+
 			// Último fallback: resposta básica
 			return res.json({
 				triagem_id: `triagem_fallback_${Date.now()}`,
@@ -427,7 +455,7 @@ export async function triagemVoz(req, res) {
 
 	} catch (error) {
 		console.error('❌ Erro geral na triagem por voz:', error);
-		return res.status(500).json({ 
+		return res.status(500).json({
 			error: 'Erro interno no processamento da triagem',
 			details: process.env.NODE_ENV === 'development' ? error.message : undefined
 		});
@@ -488,7 +516,7 @@ export async function getConversationAnalytics(req, res) {
 				{ hour: '17:00', conversations: 15 }
 			]
 		};
-		
+
 		return res.json(analytics);
 	} catch (err) {
 		return res.status(500).json({ error: 'Falha ao obter analytics', details: err.message });
@@ -530,7 +558,7 @@ export async function listKnowledge(req, res) {
 				helpful: 20
 			}
 		];
-		
+
 		return res.json(knowledgeItems);
 	} catch (err) {
 		return res.status(500).json({ error: 'Falha ao listar conhecimento', details: err.message });
@@ -540,11 +568,11 @@ export async function listKnowledge(req, res) {
 export async function createKnowledge(req, res) {
 	try {
 		const { title, content, category, tags, type, priority } = req.body;
-		
+
 		if (!title || !content || !category) {
 			return res.status(400).json({ error: 'Título, conteúdo e categoria são obrigatórios' });
 		}
-		
+
 		const newItem = {
 			id: Date.now(),
 			title,
@@ -560,7 +588,7 @@ export async function createKnowledge(req, res) {
 			views: 0,
 			helpful: 0
 		};
-		
+
 		return res.status(201).json(newItem);
 	} catch (err) {
 		return res.status(500).json({ error: 'Falha ao criar item de conhecimento', details: err.message });
@@ -571,14 +599,14 @@ export async function updateKnowledge(req, res) {
 	try {
 		const { id } = req.params;
 		const updates = req.body;
-		
+
 		// Simular atualização
 		const updatedItem = {
 			id: parseInt(id),
 			...updates,
 			updatedAt: new Date().toISOString()
 		};
-		
+
 		return res.json(updatedItem);
 	} catch (err) {
 		return res.status(500).json({ error: 'Falha ao atualizar item', details: err.message });
@@ -588,7 +616,7 @@ export async function updateKnowledge(req, res) {
 export async function deleteKnowledge(req, res) {
 	try {
 		const { id } = req.params;
-		
+
 		// Simular exclusão
 		return res.json({ message: `Item ${id} excluído com sucesso` });
 	} catch (err) {
@@ -605,7 +633,7 @@ export async function getKnowledgeCategories(req, res) {
 			{ id: 'atendimento', name: 'Atendimento', count: 6 },
 			{ id: 'politicas', name: 'Políticas', count: 4 }
 		];
-		
+
 		return res.json(categories);
 	} catch (err) {
 		return res.status(500).json({ error: 'Falha ao obter categorias', details: err.message });
@@ -654,7 +682,7 @@ export async function getUserSettings(req, res) {
 				dataRetention: 30
 			}
 		};
-		
+
 		return res.json(defaultSettings);
 	} catch (err) {
 		return res.status(500).json({ error: 'Falha ao obter configurações', details: err.message });
@@ -664,9 +692,9 @@ export async function getUserSettings(req, res) {
 export async function updateUserSettings(req, res) {
 	try {
 		const settings = req.body;
-		
+
 		// Simular salvamento das configurações
-		return res.json({ 
+		return res.json({
 			message: 'Configurações atualizadas com sucesso',
 			settings: settings
 		});
@@ -700,7 +728,7 @@ export async function listFeedback(req, res) {
 				userType: 'mecanico'
 			}
 		];
-		
+
 		return res.json(mockFeedbacks);
 	} catch (err) {
 		return res.status(500).json({ error: 'Falha ao listar feedback', details: err.message });
@@ -710,11 +738,11 @@ export async function listFeedback(req, res) {
 export async function createFeedback(req, res) {
 	try {
 		const { rating, comment, category, conversationId } = req.body;
-		
+
 		if (!rating || rating < 1 || rating > 5) {
 			return res.status(400).json({ error: 'Rating deve ser entre 1 e 5' });
 		}
-		
+
 		const newFeedback = {
 			id: Date.now(),
 			userId: req.user?.id || 'anonymous',
@@ -725,10 +753,10 @@ export async function createFeedback(req, res) {
 			createdAt: new Date().toISOString(),
 			userType: req.user?.tipo || 'cliente'
 		};
-		
+
 		// Adicionar ao log
 		feedbackLog.push(newFeedback);
-		
+
 		return res.status(201).json(newFeedback);
 	} catch (err) {
 		return res.status(500).json({ error: 'Falha ao criar feedback', details: err.message });
@@ -741,12 +769,12 @@ export async function getProvidersStatus(req, res) {
 	try {
 		const providers = ['ollama', 'huggingface', 'openai', 'custom'];
 		const status = {};
-		
+
 		for (const providerName of providers) {
 			try {
 				const provider = aiProviderFactory.getProvider(providerName);
 				const isAvailable = await provider.isAvailable();
-				
+
 				status[providerName] = {
 					available: isAvailable,
 					description: getProviderDescription(providerName),
@@ -760,7 +788,7 @@ export async function getProvidersStatus(req, res) {
 				};
 			}
 		}
-		
+
 		return res.json({
 			currentProvider: process.env.AI_PROVIDER || 'ollama',
 			providers: status,
@@ -774,17 +802,17 @@ export async function getProvidersStatus(req, res) {
 export async function testProvider(req, res) {
 	try {
 		const { provider, prompt = "Diga 'Olá' de forma amigável" } = req.body;
-		
+
 		if (!provider) {
 			return res.status(400).json({ error: 'Provider é obrigatório' });
 		}
-		
+
 		const aiProvider = aiProviderFactory.getProvider(provider);
 		const startTime = Date.now();
-		
+
 		const response = await aiProvider.generateText(prompt, { maxTokens: 100 });
 		const endTime = Date.now();
-		
+
 		return res.json({
 			provider,
 			prompt,
@@ -795,10 +823,10 @@ export async function testProvider(req, res) {
 			success: true
 		});
 	} catch (error) {
-		return res.status(500).json({ 
+		return res.status(500).json({
 			provider: req.body.provider,
 			success: false,
-			error: error.message 
+			error: error.message
 		});
 	}
 }
@@ -806,9 +834,9 @@ export async function testProvider(req, res) {
 export async function compareProviders(req, res) {
 	try {
 		const { prompt = "Explique brevemente o que é manutenção preventiva automotiva", providers } = req.body;
-		
+
 		const results = await aiProviderFactory.compareProviders(prompt, { providers });
-		
+
 		return res.json({
 			prompt,
 			results,
@@ -822,13 +850,13 @@ export async function compareProviders(req, res) {
 export async function listOllamaModels(req, res) {
 	try {
 		const provider = aiProviderFactory.getProvider('ollama');
-		
+
 		if (!await provider.isAvailable()) {
 			return res.status(503).json({ error: 'Ollama não está disponível' });
 		}
-		
+
 		const models = await provider.listInstalledModels();
-		
+
 		return res.json({
 			installed: models,
 			recommended: [
@@ -846,17 +874,17 @@ export async function listOllamaModels(req, res) {
 export async function installOllamaModel(req, res) {
 	try {
 		const { modelName } = req.body;
-		
+
 		if (!modelName) {
 			return res.status(400).json({ error: 'Nome do modelo é obrigatório' });
 		}
-		
+
 		const provider = aiProviderFactory.getProvider('ollama');
-		
+
 		if (!await provider.isAvailable()) {
 			return res.status(503).json({ error: 'Ollama não está disponível' });
 		}
-		
+
 		// Iniciar instalação em background
 		provider.installModel(modelName)
 			.then(success => {
@@ -865,7 +893,7 @@ export async function installOllamaModel(req, res) {
 			.catch(error => {
 				console.error(`❌ Erro ao instalar ${modelName}:`, error.message);
 			});
-		
+
 		return res.json({
 			message: `Instalação do modelo ${modelName} iniciada em background`,
 			modelName,
@@ -879,16 +907,16 @@ export async function installOllamaModel(req, res) {
 export async function startTraining(req, res) {
 	try {
 		const { modelName, trainingData, config } = req.body;
-		
+
 		if (!modelName || !trainingData) {
 			return res.status(400).json({ error: 'Nome do modelo e dados de treinamento são obrigatórios' });
 		}
-		
+
 		const provider = aiProviderFactory.getProvider('custom');
-		
+
 		// Iniciar treinamento em background
 		const trainingId = `training_${Date.now()}`;
-		
+
 		provider.trainModel(trainingData, { name: modelName, ...config })
 			.then(success => {
 				console.log(`✅ Treinamento ${trainingId} ${success ? 'concluído' : 'falhou'}`);
@@ -896,7 +924,7 @@ export async function startTraining(req, res) {
 			.catch(error => {
 				console.error(`❌ Erro no treinamento ${trainingId}:`, error.message);
 			});
-		
+
 		return res.json({
 			message: `Treinamento do modelo ${modelName} iniciado`,
 			trainingId,
@@ -933,7 +961,7 @@ function getProviderDescription(providerName) {
 		'openai': 'IA premium - OpenAI GPT (requer chave API paga)',
 		'custom': 'IA própria - Modelos treinados especificamente para sua oficina'
 	};
-	
+
 	return descriptions[providerName] || 'Provedor desconhecido';
 }
 
